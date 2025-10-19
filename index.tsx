@@ -1,22 +1,47 @@
 
 import Phaser from 'phaser';
-import { GAME_WIDTH, GAME_HEIGHT, PLAYER_SPEED, PLAYER_JUMP_VELOCITY, GRAVITY, SPEED_BOOST_MODIFIER, SPEED_BOOST_DURATION, JUMP_BOOST_MODIFIER, JUMP_BOOST_DURATION, ENEMY_SPEED, CHALLENGES, DAILY_CHALLENGE_REWARD } from './constants';
+import { GAME_WIDTH, GAME_HEIGHT, PLAYER_SPEED, PLAYER_JUMP_VELOCITY, GRAVITY, SPEED_BOOST_MODIFIER, SPEED_BOOST_DURATION, JUMP_BOOST_MODIFIER, JUMP_BOOST_DURATION, ENEMY_SPEED, CHALLENGES, DAILY_CHALLENGE_REWARD, LEVELS } from './constants';
 
 class MainMenuScene extends Phaser.Scene {
     add!: Phaser.GameObjects.GameObjectFactory;
     input!: Phaser.Input.InputPlugin;
     scene!: Phaser.Scenes.ScenePlugin;
+    make!: Phaser.GameObjects.GameObjectCreator;
 
     constructor() {
         super({ key: 'MainMenuScene' });
     }
+    
+    preload() {
+        const bgGraphics = this.make.graphics();
+        bgGraphics.fillStyle(0x87ceeb);
+        bgGraphics.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+        bgGraphics.fillStyle(0x1e4620, 0.5);
+        for (let i = 0; i < 15; i++) {
+            const x = Math.random() * GAME_WIDTH;
+            const h = 100 + Math.random() * 150;
+            const w = 40 + Math.random() * 40;
+            bgGraphics.fillEllipse(x, GAME_HEIGHT - h/2 + 50, w, h);
+        }
+         bgGraphics.fillStyle(0x2f6b2f, 0.7);
+        for (let i = 0; i < 20; i++) {
+            const x = Math.random() * GAME_WIDTH;
+            const h = 150 + Math.random() * 200;
+            const w = 50 + Math.random() * 50;
+            bgGraphics.fillEllipse(x, GAME_HEIGHT - h/2 + 80, w, h);
+        }
+        bgGraphics.generateTexture('background', GAME_WIDTH, GAME_HEIGHT);
+        bgGraphics.destroy();
+    }
 
     create() {
-        this.add.rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, 0x1a202c).setOrigin(0);
+        this.add.image(0, 0, 'background').setOrigin(0);
         this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 200, 'Ultimate Level Challenge', {
             fontSize: '64px',
-            color: '#48bb78',
-            fontStyle: 'bold'
+            color: '#f7fafc',
+            fontStyle: 'bold',
+            stroke: '#2d3748',
+            strokeThickness: 8
         }).setOrigin(0.5);
 
         // Daily Challenge Display
@@ -30,30 +55,34 @@ class MainMenuScene extends Phaser.Scene {
 
         this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 50, 'Daily Challenge:', {
             fontSize: '32px',
-            color: '#a0aec0'
+            color: '#2d3748',
+            fontStyle: 'bold'
         }).setOrigin(0.5);
         
         this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2, todayChallenge.description, {
             fontSize: '28px',
-            color: '#cbd5e0'
+            color: '#1a202c',
+            fontStyle: 'bold'
         }).setOrigin(0.5);
 
         if (isCompleted) {
              this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 40, '(Completed)', {
                 fontSize: '24px',
-                color: '#48bb78'
+                color: '#38a169',
+                fontStyle: 'bold'
             }).setOrigin(0.5);
         }
 
 
         this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 150, 'Click to Start', {
             fontSize: '32px',
-            color: '#a0aec0'
+            color: '#2d3748',
+            fontStyle: 'bold'
         }).setOrigin(0.5);
 
         this.input.once('pointerdown', () => {
-            this.scene.start('GameScene', { challenge: todayChallenge, isCompleted: isCompleted });
-            this.scene.start('UIScene', { challenge: todayChallenge, isCompleted: isCompleted });
+            this.scene.start('GameScene', { challenge: todayChallenge, isCompleted: isCompleted, levelIndex: 0, score: 0 });
+            this.scene.start('UIScene', { challenge: todayChallenge, isCompleted: isCompleted, levelIndex: 0 });
         });
     }
 }
@@ -93,128 +122,195 @@ class GameScene extends Phaser.Scene {
     private levelStartTime = 0;
     private challengeCompleteText?: Phaser.GameObjects.Text;
 
+    private levelIndex = 0;
+    private initialScore = 0;
+
 
     constructor() {
         super({ key: 'GameScene' });
     }
     
-    init(data: { challenge: any; isCompleted: boolean }) {
+    init(data: { challenge: any; isCompleted: boolean; levelIndex: number; score?: number }) {
         this.dailyChallenge = data.challenge;
         this.isChallengeCompleted = data.isCompleted;
+        this.levelIndex = data.levelIndex;
+        this.initialScore = data.score || 0;
     }
 
     preload() {
-        // Avatar
+        // Avatar - Little Explorer
         const avatarGraphics = this.make.graphics();
-        avatarGraphics.fillStyle(0x63b3ed);
-        avatarGraphics.fillRect(16, 24, 32, 40); 
-        avatarGraphics.fillStyle(0x90cdf4);
-        avatarGraphics.fillRect(24, 8, 16, 16);
-        avatarGraphics.generateTexture('avatar', 64, 64);
+        avatarGraphics.fillStyle(0x8b5a2b);
+        avatarGraphics.fillRect(16, 16, 32, 8);
+        avatarGraphics.fillRect(22, 8, 20, 8);
+        avatarGraphics.fillStyle(0xffd3a9);
+        avatarGraphics.fillRect(24, 24, 16, 16);
+        avatarGraphics.fillStyle(0x4a5568);
+        avatarGraphics.fillRect(20, 40, 24, 18);
+        avatarGraphics.fillStyle(0x5a3a22);
+        avatarGraphics.fillRect(22, 58, 8, 10);
+        avatarGraphics.fillRect(34, 58, 8, 10);
+        avatarGraphics.generateTexture('avatar', 64, 68);
         avatarGraphics.destroy();
 
-        // Platform
-        const platformGraphics = this.make.graphics({ fillStyle: { color: 0x4a5568 } });
+        // Platform - Mossy rock/wood
+        const platformGraphics = this.make.graphics();
+        platformGraphics.fillStyle(0x6b4a2b);
         platformGraphics.fillRect(0, 0, 200, 32);
+        platformGraphics.fillStyle(0x48bb78, 0.7);
+        platformGraphics.fillRect(0, 0, 200, 8);
+        platformGraphics.fillRect(30, 8, 50, 5);
+        platformGraphics.fillRect(120, 8, 40, 5);
         platformGraphics.generateTexture('platform', 200, 32);
         platformGraphics.destroy();
         
-        // Coin
-        const coinGraphics = this.make.graphics({ fillStyle: { color: 0xf6e05e } });
-        coinGraphics.fillCircle(16, 16, 16);
+        // Coin - Banana
+        const coinGraphics = this.make.graphics();
+        coinGraphics.fillStyle(0xf6e05e);
+        coinGraphics.beginPath();
+        // Draw a crescent/banana shape using two arcs
+        coinGraphics.arc(16, 30, 14, Phaser.Math.DegToRad(180), Phaser.Math.DegToRad(360), false);
+        coinGraphics.arc(16, 25, 12, Phaser.Math.DegToRad(0), Phaser.Math.DegToRad(180), true);
+        coinGraphics.closePath();
+        coinGraphics.fillPath();
+        // Add a small brown stem
+        coinGraphics.fillStyle(0x6b4a2b);
+        coinGraphics.fillRect(27, 16, 3, 5);
         coinGraphics.generateTexture('coin', 32, 32);
         coinGraphics.destroy();
         
-        // Trap
-        const trapGraphics = this.make.graphics({ fillStyle: { color: 0xc53030 } });
-        trapGraphics.fillRect(0, 0, 64, 32);
+        // Trap - Spikes
+        const trapGraphics = this.make.graphics();
+        trapGraphics.fillStyle(0x8b5a2b);
+        trapGraphics.beginPath();
+        trapGraphics.moveTo(0, 32);
+        for (let i = 0; i < 4; i++) {
+            trapGraphics.lineTo(i * 16 + 8, 0);
+            trapGraphics.lineTo((i + 1) * 16, 32);
+        }
+        trapGraphics.closePath();
+        trapGraphics.fillPath();
         trapGraphics.generateTexture('trap', 64, 32);
         trapGraphics.destroy();
         
-        // Goal
-        const goalGraphics = this.make.graphics({ fillStyle: { color: 0x38a169 } });
+        // Goal - Temple Door
+        const goalGraphics = this.make.graphics();
+        goalGraphics.fillStyle(0x718096);
         goalGraphics.fillRect(0, 0, 64, 128);
+        goalGraphics.fillStyle(0x2d3748);
+        goalGraphics.fillRect(12, 20, 40, 108);
+        goalGraphics.fillStyle(0xa0aec0);
+        goalGraphics.fillRect(8, 12, 48, 8);
         goalGraphics.generateTexture('goal', 64, 128);
         goalGraphics.destroy();
         
-        // Enemy
+        // Enemy - Snake
         const enemyGraphics = this.make.graphics();
-        enemyGraphics.fillStyle(0xe53e3e);
-        enemyGraphics.fillRect(8, 8, 32, 32);
-        enemyGraphics.fillStyle(0xffffff);
-        enemyGraphics.fillCircle(18, 18, 4);
-        enemyGraphics.fillCircle(30, 18, 4);
+        enemyGraphics.fillStyle(0x48bb78);
+        enemyGraphics.fillEllipse(24, 24, 40, 16);
+        enemyGraphics.fillStyle(0x000000);
+        enemyGraphics.fillCircle(12, 20, 3);
+        // Forked tongue - using a filled polygon for stability
+        enemyGraphics.fillStyle(0xf56565);
+        enemyGraphics.beginPath();
+        enemyGraphics.moveTo(8, 24); // base of tongue
+        enemyGraphics.lineTo(2, 21); // top fork tip
+        enemyGraphics.lineTo(4, 24); // inner point
+        enemyGraphics.lineTo(2, 27); // bottom fork tip
+        enemyGraphics.closePath();
+        enemyGraphics.fillPath();
         enemyGraphics.generateTexture('enemy', 48, 48);
         enemyGraphics.destroy();
 
         // Power-ups
         const speedGraphics = this.make.graphics();
         speedGraphics.fillStyle(0x4299e1);
-        speedGraphics.slice(16, 16, 12, Phaser.Math.DegToRad(270), Phaser.Math.DegToRad(90), true);
-        speedGraphics.fillPath();
+        speedGraphics.fillRoundedRect(4, 8, 24, 16, 5);
+        speedGraphics.fillStyle(0xffffff);
+        speedGraphics.fillRoundedRect(8, 6, 18, 10, 4);
         speedGraphics.generateTexture('speed_boost', 32, 32);
         speedGraphics.destroy();
 
         const shieldPowerupGraphics = this.make.graphics();
-        shieldPowerupGraphics.fillStyle(0x4fd1c5, 0.5);
-        shieldPowerupGraphics.fillCircle(16, 16, 16);
-        shieldPowerupGraphics.lineStyle(2, 0x4fd1c5);
-        shieldPowerupGraphics.strokeCircle(16, 16, 16);
+        shieldPowerupGraphics.fillStyle(0x8b5a2b);
+        shieldPowerupGraphics.fillEllipse(16, 16, 28, 22);
+        shieldPowerupGraphics.lineStyle(2, 0x6b4a2b);
+        shieldPowerupGraphics.strokeEllipse(16, 16, 28, 22);
+        shieldPowerupGraphics.fillStyle(0x6b4a2b);
+        shieldPowerupGraphics.fillRect(4, 15, 24, 2);
         shieldPowerupGraphics.generateTexture('shield_powerup', 32, 32);
         shieldPowerupGraphics.destroy();
 
         const activeShieldGraphics = this.make.graphics();
-        activeShieldGraphics.fillStyle(0x4fd1c5, 0.3);
+        activeShieldGraphics.fillStyle(0x9ae6b4, 0.4);
         activeShieldGraphics.fillCircle(40, 40, 38);
-        activeShieldGraphics.lineStyle(2, 0x81e6d9);
+        activeShieldGraphics.lineStyle(2, 0x68d391);
         activeShieldGraphics.strokeCircle(40, 40, 38);
         activeShieldGraphics.generateTexture('shield_active', 80, 80);
         activeShieldGraphics.destroy();
 
         const jumpGraphics = this.make.graphics();
-        jumpGraphics.fillStyle(0x9f7aea);
-        jumpGraphics.fillEllipse(16, 16, 20, 10);
+        jumpGraphics.fillStyle(0x68d391);
+        jumpGraphics.fillEllipse(16, 18, 20, 14);
+        jumpGraphics.fillStyle(0xffffff);
+        jumpGraphics.fillCircle(12, 14, 5);
+        jumpGraphics.fillCircle(20, 14, 5);
+        jumpGraphics.fillStyle(0x000000);
+        jumpGraphics.fillCircle(12, 14, 2);
+        jumpGraphics.fillCircle(20, 14, 2);
         jumpGraphics.generateTexture('jump_boost', 32, 32);
         jumpGraphics.destroy();
     }
 
     create() {
-        this.cameras.main.setBackgroundColor('#2d3748');
+        this.add.image(0, 0, 'background').setOrigin(0).setDepth(-1);
         this.physics.world.setBounds(0, 0, GAME_WIDTH, GAME_HEIGHT);
 
-        this.platforms = this.physics.add.staticGroup();
-        // Redesigned Level
-        this.platforms.create(150, GAME_HEIGHT - 50, 'platform'); // Start
-        this.platforms.create(450, GAME_HEIGHT - 150, 'platform').setScale(0.7, 1).refreshBody();
-        this.platforms.create(800, GAME_HEIGHT - 250, 'platform');
-        this.platforms.create(500, GAME_HEIGHT - 380, 'platform').setScale(0.5, 1).refreshBody();
-        this.platforms.create(900, GAME_HEIGHT - 500, 'platform');
-        this.platforms.create(1200, GAME_HEIGHT - 350, 'platform').setScale(0.8, 1).refreshBody();
-        this.platforms.create(GAME_WIDTH - 50, GAME_HEIGHT - 120, 'platform').setScale(0.5,1).refreshBody();
+        const level = LEVELS[this.levelIndex];
+        if (!level) {
+            console.error('Invalid level index:', this.levelIndex);
+            this.scene.start('MainMenuScene');
+            return;
+        }
 
-        this.player = this.physics.add.sprite(100, GAME_HEIGHT - 100, 'avatar');
+        this.platforms = this.physics.add.staticGroup();
+        level.platforms.forEach(p => {
+            const platform = this.platforms.create(p.x, p.y, 'platform');
+            // FIX: Property 'scaleY' does not exist on the inferred type of 'p'.
+            // Using 'as any' to bypass the type check and preserve the original logic,
+            // which allows for an optional 'scaleY' property.
+            if ((p as any).scaleX || (p as any).scaleY) {
+                platform.setScale((p as any).scaleX || 1, (p as any).scaleY || 1).refreshBody();
+            }
+        });
+
+        this.player = this.physics.add.sprite(level.playerStart.x, level.playerStart.y, 'avatar');
         this.player.setCollideWorldBounds(true);
 
         this.coins = this.physics.add.group({ allowGravity: false });
-        // Place enough coins for the challenge
-        for(let i = 0; i < 10; i++) {
-            this.coins.create(400 + i * 50, GAME_HEIGHT - 450, 'coin');
-        }
+        level.coins.forEach(c => {
+            this.coins.create(c.x, c.y, 'coin');
+        });
 
         this.powerups = this.physics.add.group({ allowGravity: false });
-        this.powerups.create(840, GAME_HEIGHT - 280, 'speed_boost').setData('type', 'speed');
-        this.powerups.create(500, GAME_HEIGHT - 150, 'shield_powerup').setData('type', 'shield');
-        this.powerups.create(940, GAME_HEIGHT - 530, 'jump_boost').setData('type', 'jump');
+        level.powerups.forEach(p => {
+            const key = p.type === 'shield' ? 'shield_powerup' : `${p.type}_boost`;
+            this.powerups.create(p.x, p.y, key).setData('type', p.type);
+        });
 
         const traps = this.physics.add.staticGroup();
-        traps.create(1100, GAME_HEIGHT - 50, 'trap');
+        level.traps.forEach(t => {
+            traps.create(t.x, t.y, 'trap');
+        });
 
         this.enemies = this.physics.add.group();
-        const enemy = this.enemies.create(850, GAME_HEIGHT - 280, 'enemy');
-        enemy.setCollideWorldBounds(true);
-        enemy.setVelocityX(ENEMY_SPEED);
+        level.enemies.forEach(e => {
+            const enemy = this.enemies.create(e.x, e.y, 'enemy');
+            enemy.setCollideWorldBounds(true);
+            enemy.setVelocityX(e.velocityX || ENEMY_SPEED);
+        });
 
-        const goal = this.physics.add.staticSprite(GAME_WIDTH - 50, GAME_HEIGHT - 184, 'goal');
+        const goal = this.physics.add.staticSprite(level.goal.x, level.goal.y, 'goal');
 
         this.physics.add.collider(this.player, this.platforms);
         this.physics.add.collider(this.enemies, this.platforms);
@@ -226,7 +322,7 @@ class GameScene extends Phaser.Scene {
 
         this.cursors = this.input.keyboard.createCursorKeys();
         
-        this.registry.set('score', 0);
+        this.registry.set('score', this.initialScore);
         this.events.emit('scoreChanged');
         this.events.emit('powerUpChanged', { type: 'None', timeLeft: 0 });
 
@@ -423,11 +519,32 @@ class GameScene extends Phaser.Scene {
         this.physics.pause();
         this.player.active = false;
         this.player.setTint(0x00ff00);
-        const winText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2, 'You Win!', { fontSize: '64px', color: '#f6e05e', fontStyle: 'bold' }).setOrigin(0.5);
+        
+        const nextLevelIndex = this.levelIndex + 1;
+        const isLastLevel = nextLevelIndex >= LEVELS.length;
+
+        const message = isLastLevel ? 'You Win!' : 'Level Complete!';
+        const winText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2, message, { fontSize: '64px', color: '#f6e05e', fontStyle: 'bold' }).setOrigin(0.5);
         winText.setScrollFactor(0);
+
         this.time.delayedCall(2000, () => {
             this.scene.stop('UIScene');
-            this.scene.start('MainMenuScene');
+             if (isLastLevel) {
+                this.scene.start('MainMenuScene');
+            } else {
+                const currentScore = this.registry.get('score');
+                this.scene.start('GameScene', { 
+                    challenge: this.dailyChallenge, 
+                    isCompleted: this.isCompletedForSession, 
+                    levelIndex: nextLevelIndex,
+                    score: currentScore
+                });
+                this.scene.start('UIScene', { 
+                    challenge: this.dailyChallenge, 
+                    isCompleted: this.isCompletedForSession, 
+                    levelIndex: nextLevelIndex 
+                });
+            }
         });
     }
 
@@ -484,40 +601,57 @@ class UIScene extends Phaser.Scene {
     private scoreText!: Phaser.GameObjects.Text;
     private powerUpText!: Phaser.GameObjects.Text;
     private challengeText!: Phaser.GameObjects.Text;
+    private levelText!: Phaser.GameObjects.Text;
     private dailyChallenge: any;
     private isChallengeCompleted = false;
+    private levelIndex = 0;
 
     constructor() {
         super({ key: 'UIScene' });
     }
 
-    init(data: { challenge: any; isCompleted: boolean }) {
+    init(data: { challenge: any; isCompleted: boolean; levelIndex: number }) {
         this.dailyChallenge = data.challenge;
         this.isChallengeCompleted = data.isCompleted;
+        this.levelIndex = data.levelIndex;
     }
 
     create() {
-        this.scoreText = this.add.text(16, 16, 'Coins: 0', {
+        this.scoreText = this.add.text(16, 16, 'Bananas: 0', {
             fontSize: '32px',
             color: '#f6e05e',
-            fontStyle: 'bold'
+            fontStyle: 'bold',
+            stroke: '#6b4a2b',
+            strokeThickness: 5
         });
 
         this.powerUpText = this.add.text(16, 50, 'Power-up: None', {
             fontSize: '24px',
-            color: '#a0aec0',
-            fontStyle: 'bold'
+            color: '#f7fafc',
+            fontStyle: 'bold',
+            stroke: '#2d3748',
+            strokeThickness: 4
         });
+
+        this.levelText = this.add.text(GAME_WIDTH - 16, 16, `Level: ${this.levelIndex + 1}`, {
+            fontSize: '32px',
+            color: '#f7fafc',
+            fontStyle: 'bold',
+            stroke: '#2d3748',
+            strokeThickness: 5
+        }).setOrigin(1, 0);
 
         this.challengeText = this.add.text(16, 80, '', {
              fontSize: '24px',
-            color: '#cbd5e0',
-            fontStyle: 'bold'
+            color: '#f7fafc',
+            fontStyle: 'bold',
+            stroke: '#2d3748',
+            strokeThickness: 4
         });
         
         const gameScene = this.scene.get('GameScene');
         gameScene.events.on('scoreChanged', () => {
-            this.scoreText.setText('Coins: ' + gameScene.registry.get('score'));
+            this.scoreText.setText('Bananas: ' + gameScene.registry.get('score') / 10);
         });
 
         gameScene.events.on('powerUpChanged', (data: { type: string, timeLeft: number }) => {
