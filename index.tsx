@@ -1,6 +1,5 @@
-
 import Phaser from 'phaser';
-import { GAME_WIDTH, GAME_HEIGHT, PLAYER_SPEED, PLAYER_JUMP_VELOCITY, GRAVITY, SPEED_BOOST_MODIFIER, SPEED_BOOST_DURATION, JUMP_BOOST_MODIFIER, JUMP_BOOST_DURATION, ENEMY_SPEED, CHALLENGES, DAILY_CHALLENGE_REWARD, LEVELS } from './constants';
+import { GAME_WIDTH, GAME_HEIGHT, PLAYER_SPEED, PLAYER_JUMP_VELOCITY, GRAVITY, SPEED_BOOST_MODIFIER, SPEED_BOOST_DURATION, JUMP_BOOST_MODIFIER, JUMP_BOOST_DURATION, ENEMY_SPEED, CHALLENGES, DAILY_CHALLENGE_REWARD, LEVELS, DASH_VELOCITY, DASH_DURATION, DASH_COOLDOWN } from './constants';
 
 class MainMenuScene extends Phaser.Scene {
     add!: Phaser.GameObjects.GameObjectFactory;
@@ -81,12 +80,141 @@ class MainMenuScene extends Phaser.Scene {
         }).setOrigin(0.5);
 
         this.input.once('pointerdown', () => {
-            this.scene.start('GameScene', { challenge: todayChallenge, isCompleted: isCompleted, levelIndex: 0, score: 0 });
-            this.scene.start('UIScene', { challenge: todayChallenge, isCompleted: isCompleted, levelIndex: 0 });
+            this.scene.start('LevelSelectScene', { challenge: todayChallenge, isCompleted: isCompleted });
         });
     }
 }
 
+class LevelSelectScene extends Phaser.Scene {
+    add!: Phaser.GameObjects.GameObjectFactory;
+    input!: Phaser.Input.InputPlugin;
+    scene!: Phaser.Scenes.ScenePlugin;
+    make!: Phaser.GameObjects.GameObjectCreator;
+
+    private dailyChallenge: any;
+    private isChallengeCompleted = false;
+    
+    constructor() {
+        super({ key: 'LevelSelectScene' });
+    }
+
+    init(data: { challenge: any; isCompleted: boolean; }) {
+        this.dailyChallenge = data.challenge;
+        this.isChallengeCompleted = data.isCompleted;
+    }
+
+    preload() {
+        // Lock Icon
+        const lockGraphics = this.make.graphics();
+        lockGraphics.fillStyle(0x4a5568); // dark grey
+        lockGraphics.fillRoundedRect(8, 12, 16, 14, 4); // body
+        lockGraphics.lineStyle(4, 0x718096); // light grey
+        lockGraphics.beginPath();
+        lockGraphics.arc(16, 12, 8, Phaser.Math.DegToRad(180), Phaser.Math.DegToRad(360));
+        lockGraphics.strokePath();
+        lockGraphics.generateTexture('lock_icon', 32, 32);
+        lockGraphics.destroy();
+    }
+
+    create() {
+        this.add.image(0, 0, 'background').setOrigin(0);
+
+        this.add.text(GAME_WIDTH / 2, 80, 'Select Level', {
+            fontSize: '64px',
+            color: '#f7fafc',
+            fontStyle: 'bold',
+            stroke: '#2d3748',
+            strokeThickness: 8
+        }).setOrigin(0.5);
+        
+        const unlockedLevel = parseInt(localStorage.getItem('ultimateLevelChallenge_unlockedLevel') || '0', 10);
+        
+        const levelsPerRow = 6;
+        const buttonSize = 80;
+        const buttonSpacing = 30;
+        const gridWidth = levelsPerRow * (buttonSize + buttonSpacing) - buttonSpacing;
+        const startX = (GAME_WIDTH - gridWidth) / 2;
+        const startY = 200;
+        
+        LEVELS.forEach((level, index) => {
+            const row = Math.floor(index / levelsPerRow);
+            const col = index % levelsPerRow;
+            
+            const x = startX + col * (buttonSize + buttonSpacing) + buttonSize / 2;
+            const y = startY + row * (buttonSize + buttonSpacing) + buttonSize / 2;
+
+            const isLocked = index > unlockedLevel;
+
+            const buttonContainer = this.add.container(x, y);
+
+            const buttonBg = this.add.graphics();
+            buttonBg.fillStyle(isLocked ? 0x4a5568 : 0x8b5a2b);
+            buttonBg.fillRoundedRect(-buttonSize/2, -buttonSize/2, buttonSize, buttonSize, 16);
+            buttonBg.lineStyle(4, isLocked ? 0x2d3748 : 0x6b4a2b);
+            buttonBg.strokeRoundedRect(-buttonSize/2, -buttonSize/2, buttonSize, buttonSize, 16);
+            buttonContainer.add(buttonBg);
+            
+            const levelText = this.add.text(0, 0, `${index + 1}`, {
+                fontSize: '40px',
+                color: '#f7fafc',
+                fontStyle: 'bold'
+            }).setOrigin(0.5);
+            buttonContainer.add(levelText);
+
+            if (isLocked) {
+                const lockIcon = this.add.image(0, 0, 'lock_icon');
+                buttonContainer.add(lockIcon);
+                levelText.setAlpha(0.3);
+            } else {
+                buttonContainer.setSize(buttonSize, buttonSize);
+                buttonContainer.setInteractive();
+                
+                buttonContainer.on('pointerover', () => {
+                    buttonBg.clear();
+                    buttonBg.fillStyle(0x6b4a2b);
+                    buttonBg.fillRoundedRect(-buttonSize/2, -buttonSize/2, buttonSize, buttonSize, 16);
+                    buttonBg.lineStyle(4, 0x4a2b1b);
+                    buttonBg.strokeRoundedRect(-buttonSize/2, -buttonSize/2, buttonSize, buttonSize, 16);
+                });
+
+                buttonContainer.on('pointerout', () => {
+                    buttonBg.clear();
+                    buttonBg.fillStyle(0x8b5a2b);
+                    buttonBg.fillRoundedRect(-buttonSize/2, -buttonSize/2, buttonSize, buttonSize, 16);
+                    buttonBg.lineStyle(4, 0x6b4a2b);
+                    buttonBg.strokeRoundedRect(-buttonSize/2, -buttonSize/2, buttonSize, buttonSize, 16);
+                });
+
+                buttonContainer.on('pointerdown', () => {
+                    this.scene.start('GameScene', {
+                        challenge: this.dailyChallenge,
+                        isCompleted: this.isChallengeCompleted,
+                        levelIndex: index,
+                        score: 0
+                    });
+                    this.scene.start('UIScene', {
+                        challenge: this.dailyChallenge,
+                        isCompleted: this.isChallengeCompleted,
+                        levelIndex: index
+                    });
+                });
+            }
+        });
+
+        // Back button
+        const backButton = this.add.text(100, GAME_HEIGHT - 70, '< Back', {
+            fontSize: '48px',
+            color: '#f7fafc',
+            fontStyle: 'bold',
+            stroke: '#2d3748',
+            strokeThickness: 6
+        }).setOrigin(0.5).setInteractive();
+
+        backButton.on('pointerover', () => backButton.setColor('#f6e05e'));
+        backButton.on('pointerout', () => backButton.setColor('#f7fafc'));
+        backButton.on('pointerdown', () => this.scene.start('MainMenuScene'));
+    }
+}
 
 class GameScene extends Phaser.Scene {
     add!: Phaser.GameObjects.GameObjectFactory;
@@ -103,6 +231,7 @@ class GameScene extends Phaser.Scene {
     private player!: Phaser.Physics.Arcade.Sprite;
     private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
     private platforms!: Phaser.Physics.Arcade.StaticGroup;
+    private movingPlatforms!: Phaser.Physics.Arcade.Group;
     private coins!: Phaser.Physics.Arcade.Group;
     private enemies!: Phaser.Physics.Arcade.Group;
     private powerups!: Phaser.Physics.Arcade.Group;
@@ -113,7 +242,15 @@ class GameScene extends Phaser.Scene {
     private currentSpeed = PLAYER_SPEED;
     private currentJumpVelocity = PLAYER_JUMP_VELOCITY;
     private isInvincible = false;
+    private canDoubleJump = false;
     
+    // Dash Properties
+    private shiftKey!: Phaser.Input.Keyboard.Key;
+    private canDash = true;
+    private isDashing = false;
+    private facingDirection = 'right';
+    private dashCooldownTimer?: Phaser.Time.TimerEvent;
+
     // Daily Challenge Properties
     private dailyChallenge: any;
     private isChallengeCompleted = false;
@@ -164,6 +301,17 @@ class GameScene extends Phaser.Scene {
         platformGraphics.generateTexture('platform', 200, 32);
         platformGraphics.destroy();
         
+        // Moving Platform
+        const movingPlatformGraphics = this.make.graphics();
+        movingPlatformGraphics.fillStyle(0x8b5a2b); // Base color
+        movingPlatformGraphics.fillRect(0, 0, 200, 32);
+        movingPlatformGraphics.fillStyle(0xf6e05e, 0.8); // Add gold accents
+        movingPlatformGraphics.fillCircle(15, 16, 8);
+        movingPlatformGraphics.fillCircle(185, 16, 8);
+        movingPlatformGraphics.fillRect(15, 14, 170, 4);
+        movingPlatformGraphics.generateTexture('moving_platform', 200, 32);
+        movingPlatformGraphics.destroy();
+
         // Coin - Banana
         const coinGraphics = this.make.graphics();
         coinGraphics.fillStyle(0xf6e05e);
@@ -276,13 +424,39 @@ class GameScene extends Phaser.Scene {
         this.platforms = this.physics.add.staticGroup();
         level.platforms.forEach(p => {
             const platform = this.platforms.create(p.x, p.y, 'platform');
-            // FIX: Property 'scaleY' does not exist on the inferred type of 'p'.
-            // Using 'as any' to bypass the type check and preserve the original logic,
-            // which allows for an optional 'scaleY' property.
             if ((p as any).scaleX || (p as any).scaleY) {
                 platform.setScale((p as any).scaleX || 1, (p as any).scaleY || 1).refreshBody();
             }
         });
+
+        this.movingPlatforms = this.physics.add.group({ allowGravity: false, immovable: true });
+        if (level.movingPlatforms) {
+            level.movingPlatforms.forEach(p => {
+                const platform = this.movingPlatforms.create(p.x, p.y, 'moving_platform') as Phaser.Physics.Arcade.Sprite;
+                if(p.scaleX) platform.setScale(p.scaleX, 1).refreshBody();
+
+                if (p.moveType === 'horizontal') {
+                    this.tweens.add({
+                        targets: platform,
+                        x: p.x + p.distance,
+                        duration: p.duration,
+                        ease: 'linear',
+                        yoyo: true,
+                        repeat: -1
+                    });
+                } else if (p.moveType === 'vertical') {
+                     this.tweens.add({
+                        targets: platform,
+                        y: p.y + p.distance,
+                        duration: p.duration,
+                        ease: 'linear',
+                        yoyo: true,
+                        repeat: -1
+                    });
+                }
+            });
+        }
+
 
         this.player = this.physics.add.sprite(level.playerStart.x, level.playerStart.y, 'avatar');
         this.player.setCollideWorldBounds(true);
@@ -313,7 +487,9 @@ class GameScene extends Phaser.Scene {
         const goal = this.physics.add.staticSprite(level.goal.x, level.goal.y, 'goal');
 
         this.physics.add.collider(this.player, this.platforms);
+        this.physics.add.collider(this.player, this.movingPlatforms);
         this.physics.add.collider(this.enemies, this.platforms);
+        this.physics.add.collider(this.enemies, this.movingPlatforms);
         this.physics.add.overlap(this.player, this.coins, this.collectCoin, undefined, this);
         this.physics.add.overlap(this.player, this.powerups, this.collectPowerUp, undefined, this);
         this.physics.add.collider(this.player, traps, this.hitTrap, undefined, this);
@@ -321,10 +497,12 @@ class GameScene extends Phaser.Scene {
         this.physics.add.overlap(this.player, goal, this.reachGoal, undefined, this);
 
         this.cursors = this.input.keyboard.createCursorKeys();
-        
+        this.shiftKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT);
+
         this.registry.set('score', this.initialScore);
         this.events.emit('scoreChanged');
         this.events.emit('powerUpChanged', { type: 'None', timeLeft: 0 });
+        this.events.emit('dashStatusChanged', { ready: true, cooldown: 0 });
 
         // Challenge Init
         this.challengeProgress = 0;
@@ -336,19 +514,25 @@ class GameScene extends Phaser.Scene {
     update() {
         if (!this.player.active) return;
         
+        if (this.isDashing) {
+            return; // Ignore other inputs while dashing
+        }
+        
         if (this.dailyChallenge.type === 'time') {
             const elapsed = (this.time.now - this.levelStartTime) / 1000;
             this.challengeProgress = elapsed;
             this.events.emit('challengeProgressChanged', { progress: this.challengeProgress });
         }
         
-        this.enemies.children.each(c => {
+        this.enemies.getChildren().forEach(c => {
             const enemy = c as Phaser.Physics.Arcade.Sprite;
             if (!enemy.active) return;
             if (enemy.body.blocked.right) {
                 enemy.setVelocityX(-ENEMY_SPEED);
+                enemy.setFlipX(false);
             } else if (enemy.body.blocked.left) {
                 enemy.setVelocityX(ENEMY_SPEED);
+                enemy.setFlipX(true);
             }
         });
 
@@ -357,19 +541,45 @@ class GameScene extends Phaser.Scene {
         }
 
         const body = this.player.body as Phaser.Physics.Arcade.Body;
-        const onGround = body.touching.down;
+        const onGround = body.touching.down || body.blocked.down;
 
         if (this.cursors.left.isDown) {
             this.player.setVelocityX(-this.currentSpeed);
+            this.player.setFlipX(true);
+            this.facingDirection = 'left';
         } else if (this.cursors.right.isDown) {
             this.player.setVelocityX(this.currentSpeed);
+            this.player.setFlipX(false);
+            this.facingDirection = 'right';
         } else {
             this.player.setVelocityX(0);
         }
 
-        if (this.cursors.up.isDown && onGround) {
-            this.player.setVelocityY(this.currentJumpVelocity);
-            this.tweens.add({ targets: this.player, scaleY: 1.2, scaleX: 0.8, duration: 100, yoyo: true, ease: 'Power1' });
+        const upJustDown = Phaser.Input.Keyboard.JustDown(this.cursors.up);
+        const shiftJustDown = Phaser.Input.Keyboard.JustDown(this.shiftKey);
+
+        if (shiftJustDown && this.canDash) {
+            this.performDash();
+        }
+
+        if (this.dashCooldownTimer) {
+            const remaining = this.dashCooldownTimer.getRemaining();
+            this.events.emit('dashStatusChanged', { ready: false, cooldown: remaining });
+        }
+
+        if (onGround) {
+            this.canDoubleJump = true;
+        }
+
+        if (upJustDown) {
+            if (onGround) {
+                this.player.setVelocityY(this.currentJumpVelocity);
+                this.tweens.add({ targets: this.player, scaleY: 1.2, scaleX: 0.8, duration: 100, yoyo: true, ease: 'Power1' });
+            } else if (this.canDoubleJump) {
+                this.player.setVelocityY(this.currentJumpVelocity * 0.85);
+                this.canDoubleJump = false;
+                this.tweens.add({ targets: this.player, scaleY: 1.2, scaleX: 0.8, duration: 100, yoyo: true, ease: 'Power1' });
+            }
         }
         
         if (this.cursors.down.isDown && !onGround) {
@@ -384,6 +594,43 @@ class GameScene extends Phaser.Scene {
         if (this.player.y > GAME_HEIGHT) {
             this.hitTrap();
         }
+    }
+
+    performDash() {
+        if (!this.canDash) return;
+
+        this.canDash = false;
+        this.isDashing = true;
+        this.isInvincible = true;
+
+        const dashVelocity = this.facingDirection === 'right' ? DASH_VELOCITY : -DASH_VELOCITY;
+        
+        (this.player.body as Phaser.Physics.Arcade.Body).setAllowGravity(false);
+        this.player.setVelocity(dashVelocity, 0);
+
+        this.tweens.add({
+            targets: this.player,
+            scaleX: this.player.flipX ? -1.5 : 1.5,
+            scaleY: 0.7,
+            duration: DASH_DURATION,
+            yoyo: true,
+            ease: 'Sine.easeInOut'
+        });
+
+        this.time.delayedCall(DASH_DURATION, () => {
+            if (!this.player.active) return;
+            this.isDashing = false;
+            // A short period of invincibility after dash
+            this.time.delayedCall(100, () => { this.isInvincible = false; });
+            (this.player.body as Phaser.Physics.Arcade.Body).setAllowGravity(true);
+            this.player.setVelocityX(0); 
+        });
+
+        this.dashCooldownTimer = this.time.delayedCall(DASH_COOLDOWN, () => {
+            this.canDash = true;
+            this.dashCooldownTimer = undefined;
+            this.events.emit('dashStatusChanged', { ready: true, cooldown: 0 });
+        });
     }
 
     collectCoin(player: Phaser.Types.Physics.Arcade.GameObjectWithBody, coin: Phaser.Types.Physics.Arcade.GameObjectWithBody) {
@@ -470,8 +717,8 @@ class GameScene extends Phaser.Scene {
         const playerSprite = player as Phaser.Physics.Arcade.Sprite;
         const enemySprite = enemy as Phaser.Physics.Arcade.Sprite;
 
-        if (playerSprite.body.velocity.y > 0 && playerSprite.y < enemySprite.y) {
-            enemySprite.disableBody(true, true);
+        if (playerSprite.body.velocity.y > 0 && playerSprite.y < enemySprite.y - (enemySprite.height * enemySprite.scaleY) / 2) {
+            enemySprite.destroy();
             playerSprite.setVelocityY(-300); // Bounce
             if (this.dailyChallenge.type === 'enemy') {
                 this.challengeProgress++;
@@ -496,7 +743,7 @@ class GameScene extends Phaser.Scene {
     }
     
     hitTrap() {
-        if (!this.player.active) return;
+        if (this.isInvincible || !this.player.active) return;
         this.isInvincible = false;
         this.tweens.killTweensOf(this.player);
         this.physics.pause();
@@ -522,6 +769,13 @@ class GameScene extends Phaser.Scene {
         
         const nextLevelIndex = this.levelIndex + 1;
         const isLastLevel = nextLevelIndex >= LEVELS.length;
+
+        if (!isLastLevel) {
+            const currentUnlocked = parseInt(localStorage.getItem('ultimateLevelChallenge_unlockedLevel') || '0', 10);
+            if (nextLevelIndex > currentUnlocked) {
+                localStorage.setItem('ultimateLevelChallenge_unlockedLevel', nextLevelIndex.toString());
+            }
+        }
 
         const message = isLastLevel ? 'You Win!' : 'Level Complete!';
         const winText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2, message, { fontSize: '64px', color: '#f6e05e', fontStyle: 'bold' }).setOrigin(0.5);
@@ -602,6 +856,7 @@ class UIScene extends Phaser.Scene {
     private powerUpText!: Phaser.GameObjects.Text;
     private challengeText!: Phaser.GameObjects.Text;
     private levelText!: Phaser.GameObjects.Text;
+    private dashText!: Phaser.GameObjects.Text;
     private dailyChallenge: any;
     private isChallengeCompleted = false;
     private levelIndex = 0;
@@ -648,6 +903,14 @@ class UIScene extends Phaser.Scene {
             stroke: '#2d3748',
             strokeThickness: 4
         });
+
+        this.dashText = this.add.text(16, 110, 'Dash: Ready', {
+            fontSize: '24px',
+            color: '#4299e1',
+            fontStyle: 'bold',
+            stroke: '#2d3748',
+            strokeThickness: 4
+        });
         
         const gameScene = this.scene.get('GameScene');
         gameScene.events.on('scoreChanged', () => {
@@ -663,6 +926,17 @@ class UIScene extends Phaser.Scene {
             }
             else {
                 this.powerUpText.setText('Power-up: None');
+            }
+        });
+
+        gameScene.events.on('dashStatusChanged', (data: { ready: boolean, cooldown: number }) => {
+            if (data.ready) {
+                this.dashText.setText('Dash: Ready');
+                this.dashText.setColor('#4299e1');
+            } else {
+                const cooldownSeconds = (data.cooldown / 1000).toFixed(1);
+                this.dashText.setText(`Dash: ${cooldownSeconds}s`);
+                this.dashText.setColor('#a0aec0');
             }
         });
 
@@ -726,7 +1000,7 @@ const config: Phaser.Types.Core.GameConfig = {
     physics: {
         default: 'arcade',
         arcade: {
-            gravity: { y: GRAVITY },
+            gravity: { x: 0, y: GRAVITY },
             debug: false
         }
     },
@@ -734,7 +1008,7 @@ const config: Phaser.Types.Core.GameConfig = {
         mode: Phaser.Scale.FIT,
         autoCenter: Phaser.Scale.CENTER_BOTH
     },
-    scene: [MainMenuScene, GameScene, UIScene, GameOverScene]
+    scene: [MainMenuScene, LevelSelectScene, GameScene, UIScene, GameOverScene]
 };
 
 new Phaser.Game(config);
