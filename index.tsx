@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { GAME_WIDTH, GAME_HEIGHT, PLAYER_SPEED, PLAYER_JUMP_VELOCITY, GRAVITY, SPEED_BOOST_MODIFIER, SPEED_BOOST_DURATION, JUMP_BOOST_MODIFIER, JUMP_BOOST_DURATION, ENEMY_SPEED, CHALLENGES, DAILY_CHALLENGE_REWARD, LEVELS, DASH_VELOCITY, DASH_DURATION, DASH_COOLDOWN } from './constants';
+import { GAME_WIDTH, GAME_HEIGHT, PLAYER_SPEED, PLAYER_JUMP_VELOCITY, GRAVITY, SPEED_BOOST_MODIFIER, SPEED_BOOST_DURATION, JUMP_BOOST_MODIFIER, JUMP_BOOST_DURATION, ENEMY_SPEED, CHALLENGES, DAILY_CHALLENGE_REWARD, LEVELS, DASH_VELOCITY, DASH_DURATION, DASH_COOLDOWN, BOSS_HEALTH } from './constants';
 
 class MainMenuScene extends Phaser.Scene {
     add!: Phaser.GameObjects.GameObjectFactory;
@@ -129,12 +129,12 @@ class LevelSelectScene extends Phaser.Scene {
         
         const unlockedLevel = parseInt(localStorage.getItem('ultimateLevelChallenge_unlockedLevel') || '0', 10);
         
-        const levelsPerRow = 6;
-        const buttonSize = 80;
-        const buttonSpacing = 30;
+        const levelsPerRow = 5;
+        const buttonSize = 100;
+        const buttonSpacing = 40;
         const gridWidth = levelsPerRow * (buttonSize + buttonSpacing) - buttonSpacing;
         const startX = (GAME_WIDTH - gridWidth) / 2;
-        const startY = 200;
+        const startY = 220;
         
         LEVELS.forEach((level, index) => {
             const row = Math.floor(index / levelsPerRow);
@@ -144,21 +144,26 @@ class LevelSelectScene extends Phaser.Scene {
             const y = startY + row * (buttonSize + buttonSpacing) + buttonSize / 2;
 
             const isLocked = index > unlockedLevel;
+            const isBossLevel = !!level.boss;
 
             const buttonContainer = this.add.container(x, y);
 
             const buttonBg = this.add.graphics();
-            buttonBg.fillStyle(isLocked ? 0x4a5568 : 0x8b5a2b);
+            buttonBg.fillStyle(isLocked ? 0x4a5568 : (isBossLevel ? 0x9b2c2c : 0x8b5a2b));
             buttonBg.fillRoundedRect(-buttonSize/2, -buttonSize/2, buttonSize, buttonSize, 16);
-            buttonBg.lineStyle(4, isLocked ? 0x2d3748 : 0x6b4a2b);
+            buttonBg.lineStyle(4, isLocked ? 0x2d3748 : (isBossLevel ? 0x742a2a : 0x6b4a2b));
             buttonBg.strokeRoundedRect(-buttonSize/2, -buttonSize/2, buttonSize, buttonSize, 16);
             buttonContainer.add(buttonBg);
             
             const levelText = this.add.text(0, 0, `${index + 1}`, {
-                fontSize: '40px',
+                fontSize: '50px',
                 color: '#f7fafc',
                 fontStyle: 'bold'
             }).setOrigin(0.5);
+            if (isBossLevel) {
+                 levelText.setText('B');
+                 levelText.setFontSize('60px');
+            }
             buttonContainer.add(levelText);
 
             if (isLocked) {
@@ -171,17 +176,17 @@ class LevelSelectScene extends Phaser.Scene {
                 
                 buttonContainer.on('pointerover', () => {
                     buttonBg.clear();
-                    buttonBg.fillStyle(0x6b4a2b);
+                    buttonBg.fillStyle(isBossLevel ? 0x742a2a : 0x6b4a2b);
                     buttonBg.fillRoundedRect(-buttonSize/2, -buttonSize/2, buttonSize, buttonSize, 16);
-                    buttonBg.lineStyle(4, 0x4a2b1b);
+                    buttonBg.lineStyle(4, isBossLevel ? 0x521b1b : 0x4a2b1b);
                     buttonBg.strokeRoundedRect(-buttonSize/2, -buttonSize/2, buttonSize, buttonSize, 16);
                 });
 
                 buttonContainer.on('pointerout', () => {
                     buttonBg.clear();
-                    buttonBg.fillStyle(0x8b5a2b);
+                    buttonBg.fillStyle(isBossLevel ? 0x9b2c2c : 0x8b5a2b);
                     buttonBg.fillRoundedRect(-buttonSize/2, -buttonSize/2, buttonSize, buttonSize, 16);
-                    buttonBg.lineStyle(4, 0x6b4a2b);
+                    buttonBg.lineStyle(4, isBossLevel ? 0x742a2a : 0x6b4a2b);
                     buttonBg.strokeRoundedRect(-buttonSize/2, -buttonSize/2, buttonSize, buttonSize, 16);
                 });
 
@@ -262,6 +267,27 @@ class GameScene extends Phaser.Scene {
     private levelIndex = 0;
     private initialScore = 0;
 
+    // Boss properties
+    private boss?: Phaser.Physics.Arcade.Sprite;
+    private bossHealth = 0;
+    private projectiles!: Phaser.Physics.Arcade.Group;
+    private homingProjectiles!: Phaser.Physics.Arcade.Group;
+    private isBossLevel = false;
+    private goal?: Phaser.Physics.Arcade.Sprite;
+    private attackTimer?: Phaser.Time.TimerEvent;
+    private bossAttackPattern = 1;
+
+    // Hazard properties
+    private fallingRockSpawners!: Phaser.Physics.Arcade.StaticGroup;
+    private fallingRocks!: Phaser.Physics.Arcade.Group;
+    private geysers!: Phaser.Physics.Arcade.Group;
+    private quicksandPits!: Phaser.Physics.Arcade.StaticGroup;
+    private playerInQuicksand = false;
+
+    // Visual Effects
+    private vines!: Phaser.GameObjects.Group;
+    private drips!: Phaser.Physics.Arcade.Group;
+
 
     constructor() {
         super({ key: 'GameScene' });
@@ -272,6 +298,8 @@ class GameScene extends Phaser.Scene {
         this.isChallengeCompleted = data.isCompleted;
         this.levelIndex = data.levelIndex;
         this.initialScore = data.score || 0;
+        this.isBossLevel = false;
+        this.boss = undefined;
     }
 
     preload() {
@@ -370,6 +398,84 @@ class GameScene extends Phaser.Scene {
         enemyGraphics.generateTexture('enemy', 48, 48);
         enemyGraphics.destroy();
 
+        // Enemy - Bat
+        const batGraphics = this.make.graphics();
+        batGraphics.fillStyle(0x4a5568); // Dark grey body
+        batGraphics.fillEllipse(24, 24, 20, 12); // Body
+
+        // Create wings using paths, as Graphics object doesn't have quadraticBezierTo directly
+        const leftWing = new Phaser.Curves.Path();
+        leftWing.moveTo(15, 24);
+        leftWing.quadraticBezierTo(0, 10, 5, 5);
+        leftWing.quadraticBezierTo(15, 15, 24, 20);
+        leftWing.closePath();
+        batGraphics.fillPoints(leftWing.getPoints(), true);
+
+        const rightWing = new Phaser.Curves.Path();
+        rightWing.moveTo(33, 24);
+        rightWing.quadraticBezierTo(48, 10, 43, 5);
+        rightWing.quadraticBezierTo(33, 15, 24, 20);
+        rightWing.closePath();
+        batGraphics.fillPoints(rightWing.getPoints(), true);
+        
+        batGraphics.fillStyle(0xc53030); // Red eyes
+        batGraphics.fillCircle(20, 22, 2);
+        batGraphics.fillCircle(28, 22, 2);
+        batGraphics.generateTexture('enemy_bat', 48, 48);
+        batGraphics.destroy();
+
+        // Boss - Jungle Gorilla
+        const bossGraphics = this.make.graphics();
+        bossGraphics.fillStyle(0x5a3a22); // Dark brown fur
+        bossGraphics.fillRoundedRect(10, 20, 108, 100, 20); // Body
+        bossGraphics.fillRoundedRect(30, 0, 68, 60, 15); // Head
+        bossGraphics.fillStyle(0x4a2b1b); // Darker brown for details
+        bossGraphics.fillEllipse(64, 110, 90, 30); // Chest
+        bossGraphics.fillStyle(0xffd3a9); // Face color
+        bossGraphics.fillEllipse(64, 35, 40, 25);
+        bossGraphics.fillStyle(0xc53030); // Red eyes
+        bossGraphics.fillCircle(54, 30, 5);
+        bossGraphics.fillCircle(74, 30, 5);
+        bossGraphics.generateTexture('boss_gorilla', 128, 128);
+        bossGraphics.destroy();
+
+        // Projectile - Coconut
+        const projectileGraphics = this.make.graphics();
+        projectileGraphics.fillStyle(0x6b4a2b);
+        projectileGraphics.fillCircle(16, 16, 12);
+        projectileGraphics.fillStyle(0x4a2b1b);
+        projectileGraphics.fillCircle(12, 12, 3);
+        projectileGraphics.fillCircle(20, 12, 3);
+        projectileGraphics.generateTexture('projectile', 32, 32);
+        projectileGraphics.destroy();
+        
+        // Homing Projectile - Banana-rang
+        const homingProjectileGraphics = this.make.graphics();
+        homingProjectileGraphics.fillStyle(0xf6e05e); // Banana yellow
+        const boomerangPath = new Phaser.Curves.Path(16, 0);
+        boomerangPath.cubicBezierTo(32, 0, 32, 32, 16, 32);
+        boomerangPath.cubicBezierTo(24, 32, 24, 8, 16, 0);
+        homingProjectileGraphics.fillPoints(boomerangPath.getPoints(), true);
+        homingProjectileGraphics.generateTexture('projectile_homing', 32, 32);
+        homingProjectileGraphics.destroy();
+
+        // Boss Tell VFX
+        const sparkleGraphics = this.make.graphics();
+        sparkleGraphics.fillStyle(0xffffff);
+        sparkleGraphics.beginPath();
+        sparkleGraphics.moveTo(8, 0);
+        sparkleGraphics.lineTo(10, 6);
+        sparkleGraphics.lineTo(16, 8);
+        sparkleGraphics.lineTo(10, 10);
+        sparkleGraphics.lineTo(8, 16);
+        sparkleGraphics.lineTo(6, 10);
+        sparkleGraphics.lineTo(0, 8);
+        sparkleGraphics.lineTo(6, 6);
+        sparkleGraphics.closePath();
+        sparkleGraphics.fillPath();
+        sparkleGraphics.generateTexture('sparkle', 16, 16);
+        sparkleGraphics.destroy();
+
         // Power-ups
         const speedGraphics = this.make.graphics();
         speedGraphics.fillStyle(0x4299e1);
@@ -408,6 +514,70 @@ class GameScene extends Phaser.Scene {
         jumpGraphics.fillCircle(20, 14, 2);
         jumpGraphics.generateTexture('jump_boost', 32, 32);
         jumpGraphics.destroy();
+
+        // Hazards
+        const rockGraphics = this.make.graphics();
+        rockGraphics.fillStyle(0x718096);
+        rockGraphics.beginPath();
+        rockGraphics.moveTo(20, 0);
+        rockGraphics.lineTo(40, 10);
+        rockGraphics.lineTo(35, 35);
+        rockGraphics.lineTo(10, 40);
+        rockGraphics.lineTo(0, 20);
+        rockGraphics.closePath();
+        rockGraphics.fillPath();
+        rockGraphics.generateTexture('falling_rock', 40, 40);
+        rockGraphics.destroy();
+
+        const geyserHoleGraphics = this.make.graphics();
+        geyserHoleGraphics.fillStyle(0x6b4a2b);
+        geyserHoleGraphics.fillEllipse(24, 16, 48, 12);
+        geyserHoleGraphics.fillStyle(0x4a2b1b);
+        geyserHoleGraphics.fillEllipse(24, 14, 20, 8);
+        geyserHoleGraphics.generateTexture('geyser_hole', 48, 32);
+        geyserHoleGraphics.destroy();
+
+        const geyserJetGraphics = this.make.graphics();
+        geyserJetGraphics.fillStyle(0xedf2f7, 0.8);
+        geyserJetGraphics.fillRect(0, 0, 24, 150);
+        geyserJetGraphics.fillStyle(0xa0aec0, 0.6);
+        geyserJetGraphics.fillRect(4, 0, 16, 150);
+        geyserJetGraphics.generateTexture('geyser_jet', 24, 150);
+        geyserJetGraphics.destroy();
+        
+        const quicksandGraphics = this.make.graphics();
+        quicksandGraphics.fillStyle(0x6b4a2b);
+        quicksandGraphics.fillRect(0, 0, 100, 40);
+        quicksandGraphics.fillStyle(0x5a3a22, 0.8);
+        for(let i = 0; i < 3; i++) {
+             quicksandGraphics.fillEllipse(Phaser.Math.Between(10, 90), Phaser.Math.Between(5, 35), Phaser.Math.Between(10, 25), Phaser.Math.Between(5, 10));
+        }
+        quicksandGraphics.generateTexture('quicksand', 100, 40);
+        quicksandGraphics.destroy();
+        
+        // Visual Effects
+        const vineGraphics = this.make.graphics();
+        vineGraphics.lineStyle(8, 0x2f855a);
+        // Fix: Use a Path object to draw the quadratic bezier curve, as the Graphics object does not have a `quadraticBezierTo` method.
+        const vinePath = new Phaser.Curves.Path(10, 0);
+        vinePath.quadraticBezierTo(20, 50, 10, 100);
+        vinePath.quadraticBezierTo(0, 150, 10, 200);
+        vinePath.draw(vineGraphics);
+        vineGraphics.generateTexture('vine', 20, 200);
+        vineGraphics.destroy();
+
+        const dripGraphics = this.make.graphics();
+        dripGraphics.fillStyle(0x4299e1);
+        dripGraphics.fillEllipse(4, 8, 8, 16);
+        dripGraphics.generateTexture('drip', 16, 24);
+        dripGraphics.destroy();
+
+        const splashGraphics = this.make.graphics();
+        splashGraphics.lineStyle(2, 0x4299e1, 0.8);
+        splashGraphics.strokeCircle(16, 16, 6);
+        splashGraphics.strokeCircle(16, 16, 12);
+        splashGraphics.generateTexture('splash', 32, 32);
+        splashGraphics.destroy();
     }
 
     create() {
@@ -420,6 +590,8 @@ class GameScene extends Phaser.Scene {
             this.scene.start('MainMenuScene');
             return;
         }
+
+        this.isBossLevel = !!level.boss;
 
         this.platforms = this.physics.add.staticGroup();
         level.platforms.forEach(p => {
@@ -456,7 +628,27 @@ class GameScene extends Phaser.Scene {
                 }
             });
         }
-
+        
+        // Visual Effects Setup
+        this.vines = this.add.group();
+        if (level.vines) {
+            level.vines.forEach(v => {
+                const vine = this.vines.create(v.x, v.y, 'vine') as Phaser.GameObjects.Sprite;
+                vine.setOrigin(0.5, 0).setDepth(-1);
+            });
+        }
+        
+        this.drips = this.physics.add.group();
+        if (level.dripSpawners) {
+            level.dripSpawners.forEach(spawner => {
+                this.time.addEvent({
+                    delay: Phaser.Math.Between(2000, 6000),
+                    callback: () => this.spawnDrip(spawner.x, spawner.y),
+                    callbackScope: this,
+                    loop: true
+                });
+            });
+        }
 
         this.player = this.physics.add.sprite(level.playerStart.x, level.playerStart.y, 'avatar');
         this.player.setCollideWorldBounds(true);
@@ -476,15 +668,75 @@ class GameScene extends Phaser.Scene {
         level.traps.forEach(t => {
             traps.create(t.x, t.y, 'trap');
         });
+        
+        // Hazard Setup
+        this.fallingRockSpawners = this.physics.add.staticGroup();
+        this.fallingRocks = this.physics.add.group();
+        this.geysers = this.physics.add.group({ allowGravity: false });
+        this.quicksandPits = this.physics.add.staticGroup();
+        this.playerInQuicksand = false;
+
+        if (level.hazards) {
+            level.hazards.forEach(h => {
+                switch(h.type) {
+                    case 'falling_rock_spawner':
+                        const zone = this.fallingRockSpawners.create(h.x, h.y, undefined).setVisible(false);
+                        zone.setSize(h.width, h.height).setOrigin(0.5, 0);
+                        break;
+                    case 'geyser':
+                        this.add.sprite(h.x, h.y, 'geyser_hole').setOrigin(0.5, 1);
+                        const jet = this.geysers.create(h.x, h.y - 150, 'geyser_jet').setVisible(false);
+                        (jet.body as Phaser.Physics.Arcade.Body).enable = false;
+                        
+                        this.time.addEvent({
+                           delay: 3000,
+                           loop: true,
+                           callback: () => {
+                               if (!jet.scene) return;
+                               jet.setVisible(true);
+                               (jet.body as Phaser.Physics.Arcade.Body).enable = true;
+                               this.time.delayedCall(1000, () => {
+                                   if (jet.active) {
+                                       jet.setVisible(false);
+                                       (jet.body as Phaser.Physics.Arcade.Body).enable = false;
+                                   }
+                               });
+                           }
+                        });
+                        break;
+                    case 'quicksand':
+                        const pit = this.quicksandPits.create(h.x, h.y, 'quicksand');
+                        pit.setSize(h.width, h.height).setDisplaySize(h.width, h.height).refreshBody();
+                        break;
+                }
+            });
+        }
+
 
         this.enemies = this.physics.add.group();
-        level.enemies.forEach(e => {
-            const enemy = this.enemies.create(e.x, e.y, 'enemy');
-            enemy.setCollideWorldBounds(true);
-            enemy.setVelocityX(e.velocityX || ENEMY_SPEED);
-        });
-
-        const goal = this.physics.add.staticSprite(level.goal.x, level.goal.y, 'goal');
+        if (!this.isBossLevel) {
+            level.enemies.forEach(e => {
+                if (e.type === 'bat') {
+                    const enemy = this.enemies.create(e.x, e.y, 'enemy_bat') as Phaser.Physics.Arcade.Sprite;
+                    (enemy.body as Phaser.Physics.Arcade.Body).setAllowGravity(false);
+                    enemy.setData('type', 'bat');
+                    enemy.setData('patrolCenter', e.x);
+                    enemy.setData('isSwooping', false);
+                    enemy.setVelocityX(ENEMY_SPEED * 0.8);
+                    enemy.setCollideWorldBounds(true);
+                } else { // Default to snake
+                    const enemy = this.enemies.create(e.x, e.y, 'enemy') as Phaser.Physics.Arcade.Sprite;
+                    enemy.setData('type', 'snake');
+                    enemy.setCollideWorldBounds(true);
+                    enemy.setVelocityX(e.velocityX || ENEMY_SPEED);
+                }
+            });
+        }
+        
+        if (!this.isBossLevel) {
+            this.goal = this.physics.add.staticSprite(level.goal.x, level.goal.y, 'goal');
+            this.physics.add.overlap(this.player, this.goal, this.reachGoal, undefined, this);
+        }
 
         this.physics.add.collider(this.player, this.platforms);
         this.physics.add.collider(this.player, this.movingPlatforms);
@@ -494,7 +746,42 @@ class GameScene extends Phaser.Scene {
         this.physics.add.overlap(this.player, this.powerups, this.collectPowerUp, undefined, this);
         this.physics.add.collider(this.player, traps, this.hitTrap, undefined, this);
         this.physics.add.collider(this.player, this.enemies, this.hitEnemy, undefined, this);
-        this.physics.add.overlap(this.player, goal, this.reachGoal, undefined, this);
+        
+        // Hazard Colliders
+        this.physics.add.overlap(this.player, this.fallingRockSpawners, this.triggerFallingRock, undefined, this);
+        this.physics.add.overlap(this.player, this.fallingRocks, this.hitByHazard, undefined, this);
+        this.physics.add.overlap(this.player, this.geysers, this.hitByGeyser, undefined, this);
+        
+        // Visuals Colliders
+        this.physics.add.collider(this.drips, this.platforms, this.handleDripSplash, undefined, this);
+        this.physics.add.collider(this.drips, this.movingPlatforms, this.handleDripSplash, undefined, this);
+        
+        // Boss Setup
+        if (this.isBossLevel && level.boss) {
+            this.boss = this.physics.add.sprite(level.boss.x, level.boss.y, 'boss_gorilla').setImmovable(true);
+            this.boss.setCollideWorldBounds(true);
+            (this.boss.body as Phaser.Physics.Arcade.Body).setAllowGravity(false);
+            this.bossHealth = BOSS_HEALTH;
+            this.bossAttackPattern = level.boss.attackPattern || 1;
+            this.boss.setData('isAttacking', false);
+
+            this.projectiles = this.physics.add.group({ allowGravity: true, bounceX: 0.5, bounceY: 0.5 });
+            this.homingProjectiles = this.physics.add.group({ allowGravity: false });
+
+            this.physics.add.collider(this.boss, this.platforms);
+            this.physics.add.collider(this.player, this.boss, this.hitBoss, (player, boss) => {
+                return (player as Phaser.Physics.Arcade.Sprite).body.velocity.y > 0 && (player as Phaser.Physics.Arcade.Sprite).y < (boss as Phaser.Physics.Arcade.Sprite).y;
+            }, this);
+            this.physics.add.collider(this.projectiles, this.platforms, (projectile) => projectile.destroy(), undefined, this);
+            this.physics.add.collider(this.homingProjectiles, this.platforms, (projectile) => projectile.destroy(), undefined, this);
+            
+            this.physics.add.overlap(this.player, this.projectiles, this.hitByProjectile, undefined, this);
+            this.physics.add.overlap(this.player, this.homingProjectiles, this.hitByProjectile, undefined, this);
+
+            this.events.emit('bossSpawned', { maxHealth: BOSS_HEALTH, currentHealth: this.bossHealth });
+            this.startBossAttacks();
+        }
+
 
         this.cursors = this.input.keyboard.createCursorKeys();
         this.shiftKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT);
@@ -518,7 +805,7 @@ class GameScene extends Phaser.Scene {
             return; // Ignore other inputs while dashing
         }
         
-        if (this.dailyChallenge.type === 'time') {
+        if (this.dailyChallenge.type === 'time' && !this.isBossLevel) {
             const elapsed = (this.time.now - this.levelStartTime) / 1000;
             this.challengeProgress = elapsed;
             this.events.emit('challengeProgressChanged', { progress: this.challengeProgress });
@@ -527,14 +814,130 @@ class GameScene extends Phaser.Scene {
         this.enemies.getChildren().forEach(c => {
             const enemy = c as Phaser.Physics.Arcade.Sprite;
             if (!enemy.active) return;
-            if (enemy.body.blocked.right) {
-                enemy.setVelocityX(-ENEMY_SPEED);
-                enemy.setFlipX(false);
-            } else if (enemy.body.blocked.left) {
-                enemy.setVelocityX(ENEMY_SPEED);
-                enemy.setFlipX(true);
+
+            const type = enemy.getData('type');
+
+            if (type === 'snake') {
+                if (enemy.body.blocked.right) {
+                    enemy.setVelocityX(-ENEMY_SPEED);
+                    enemy.setFlipX(false);
+                } else if (enemy.body.blocked.left) {
+                    enemy.setVelocityX(ENEMY_SPEED);
+                    enemy.setFlipX(true);
+                }
+            } else if (type === 'bat') {
+                const isSwooping = enemy.getData('isSwooping');
+
+                if (isSwooping) {
+                    const swoopState = enemy.getData('swoopState');
+                    const originalY = enemy.getData('originalY');
+                    const patrolCenter = enemy.getData('patrolCenter');
+
+                    // State: swooping down
+                    if (swoopState === 'down' && enemy.y >= originalY + 250) {
+                        enemy.setData('swoopState', 'up');
+                        const duration = 1200; // ms to return
+                        const velocityX = (patrolCenter - enemy.x) / (duration / 1000);
+                        const velocityY = (originalY - enemy.y) / (duration / 1000);
+                        enemy.setVelocity(velocityX, velocityY);
+                    } 
+                    // State: swooping up
+                    else if (swoopState === 'up' && enemy.y <= originalY) {
+                        enemy.y = originalY; // Snap to original Y to prevent overshooting
+                        enemy.setData('isSwooping', false);
+                        enemy.setData('swoopState', undefined);
+                        enemy.setVelocity(ENEMY_SPEED * 0.8, 0); // Resume patrol
+                    }
+                } else { // Not swooping, so patrol
+                    const patrolCenter = enemy.getData('patrolCenter');
+                    if (enemy.x > patrolCenter + 100) {
+                        enemy.setVelocityX(-ENEMY_SPEED * 0.8);
+                    } else if (enemy.x < patrolCenter - 100) {
+                        enemy.setVelocityX(ENEMY_SPEED * 0.8);
+                    }
+                    
+                    // Swoop trigger logic
+                    const distanceToPlayerX = Math.abs(this.player.x - enemy.x);
+                    const distanceToPlayerY = this.player.y - enemy.y;
+                    if (this.player.active && distanceToPlayerX < 250 && distanceToPlayerY > 30 && distanceToPlayerY < 400) {
+                        // Start swoop
+                        enemy.setData('isSwooping', true);
+                        enemy.setData('swoopState', 'down');
+                        enemy.setData('originalY', enemy.y);
+                        
+                        const targetX = this.player.x;
+                        const targetY = enemy.y + 250;
+                        const duration = 800; // ms to reach target
+                        const velocityX = (targetX - enemy.x) / (duration / 1000);
+                        const velocityY = (targetY - enemy.y) / (duration / 1000);
+                        enemy.setVelocity(velocityX, velocityY);
+                    }
+                }
+                
+                // Flip sprite based on velocity, applies to all states
+                if (enemy.body.velocity.x !== 0) {
+                    enemy.setFlipX(enemy.body.velocity.x < 0);
+                }
             }
         });
+        
+        this.fallingRocks.getChildren().forEach(r => {
+            if ((r as Phaser.Physics.Arcade.Sprite).y > GAME_HEIGHT + 20) {
+                r.destroy();
+            }
+        });
+
+        // Vine swaying logic
+        this.vines.getChildren().forEach(v => {
+            const vine = v as Phaser.GameObjects.Sprite;
+            const distance = Phaser.Math.Distance.Between(this.player.x, this.player.y, vine.x, vine.y);
+            if (distance < 150 && !vine.getData('isSwaying')) {
+                vine.setData('isSwaying', true);
+                this.tweens.add({
+                    targets: vine,
+                    angle: 10,
+                    duration: 1200,
+                    ease: 'Sine.easeInOut',
+                    yoyo: true,
+                    repeat: -1,
+                });
+            } else if (distance >= 150 && vine.getData('isSwaying')) {
+                 vine.setData('isSwaying', false);
+                 this.tweens.killTweensOf(vine);
+                 this.tweens.add({ targets: vine, angle: 0, duration: 600, ease: 'Sine.easeInOut' });
+            }
+        });
+
+        // Quicksand Logic
+        let onQuicksand = false;
+        let overlappingPit: Phaser.Physics.Arcade.Sprite | null = null;
+        this.physics.overlap(this.player, this.quicksandPits, (_player, pit) => {
+            onQuicksand = true;
+            overlappingPit = pit as Phaser.Physics.Arcade.Sprite;
+        });
+        
+        if (onQuicksand) {
+            this.player.setVelocityX(this.player.body.velocity.x * 0.9);
+            if (this.player.body.velocity.y > 50) {
+                 this.player.setVelocityY(this.player.body.velocity.y * 0.9);
+            } else {
+                 this.player.setVelocityY(this.player.body.velocity.y + 15);
+            }
+            if (!this.playerInQuicksand) {
+                 this.playerInQuicksand = true;
+            }
+            // Check if fully submerged
+            if(overlappingPit && this.player.getBounds().top > overlappingPit.getBounds().centerY) {
+                this.hitTrap();
+            }
+
+        } else if (this.playerInQuicksand) {
+             this.playerInQuicksand = false;
+        }
+
+        if(this.isBossLevel && this.boss && this.boss.active) {
+            this.boss.setFlipX(this.player.x < this.boss.x);
+        }
 
         if (this.shieldActive && this.shieldSprite) {
             this.shieldSprite.setPosition(this.player.x, this.player.y);
@@ -552,7 +955,9 @@ class GameScene extends Phaser.Scene {
             this.player.setFlipX(false);
             this.facingDirection = 'right';
         } else {
-            this.player.setVelocityX(0);
+            if (!onQuicksand) { // Don't stop immediately in quicksand
+                this.player.setVelocityX(0);
+            }
         }
 
         const upJustDown = Phaser.Input.Keyboard.JustDown(this.cursors.up);
@@ -567,13 +972,13 @@ class GameScene extends Phaser.Scene {
             this.events.emit('dashStatusChanged', { ready: false, cooldown: remaining });
         }
 
-        if (onGround) {
+        if (onGround || onQuicksand) {
             this.canDoubleJump = true;
         }
 
         if (upJustDown) {
-            if (onGround) {
-                this.player.setVelocityY(this.currentJumpVelocity);
+            if (onGround || onQuicksand) {
+                this.player.setVelocityY(this.currentJumpVelocity * (onQuicksand ? 0.7 : 1));
                 this.tweens.add({ targets: this.player, scaleY: 1.2, scaleX: 0.8, duration: 100, yoyo: true, ease: 'Power1' });
             } else if (this.canDoubleJump) {
                 this.player.setVelocityY(this.currentJumpVelocity * 0.85);
@@ -593,6 +998,26 @@ class GameScene extends Phaser.Scene {
         
         if (this.player.y > GAME_HEIGHT) {
             this.hitTrap();
+        }
+
+        // Homing projectile logic
+        if (this.homingProjectiles) {
+            this.homingProjectiles.getChildren().forEach(p => {
+                const projectile = p as Phaser.Physics.Arcade.Sprite;
+                if (!projectile.active || !this.player.active) return;
+                
+                const angle = Phaser.Math.Angle.Between(projectile.x, projectile.y, this.player.x, this.player.y);
+                const currentVelocity = projectile.body.velocity.clone();
+                const targetVelocity = new Phaser.Math.Vector2();
+                this.physics.velocityFromRotation(angle, 300, targetVelocity); // Homing speed
+                
+                // Interpolate for smoother turning
+                const newVelocityX = Phaser.Math.Interpolation.Linear([currentVelocity.x, targetVelocity.x], 0.05);
+                const newVelocityY = Phaser.Math.Interpolation.Linear([currentVelocity.y, targetVelocity.y], 0.05);
+                
+                projectile.setVelocity(newVelocityX, newVelocityY);
+                projectile.setRotation(projectile.body.velocity.angle() + Math.PI / 2);
+            });
         }
     }
 
@@ -710,6 +1135,26 @@ class GameScene extends Phaser.Scene {
         }
         this.events.emit('powerUpChanged', { type: 'None', timeLeft: 0 });
     }
+    
+    takeDamage() {
+        if (this.isInvincible) return false;
+        
+        if (this.shieldActive) {
+            this.resetPowerUps();
+            this.isInvincible = true;
+            this.player.setAlpha(0.5);
+            this.time.delayedCall(1000, () => {
+                if (this.player && this.player.active) {
+                    this.player.setAlpha(1);
+                    this.isInvincible = false;
+                }
+            });
+            return false;
+        } else {
+            this.hitTrap();
+            return true;
+        }
+    }
 
     hitEnemy(player: Phaser.Types.Physics.Arcade.GameObjectWithBody, enemy: Phaser.Types.Physics.Arcade.GameObjectWithBody) {
         if (this.isInvincible) return;
@@ -726,19 +1171,7 @@ class GameScene extends Phaser.Scene {
                 this.checkChallengeCompletion();
             }
         } else {
-            if (this.shieldActive) {
-                this.resetPowerUps();
-                this.isInvincible = true;
-                this.player.setAlpha(0.5);
-                this.time.delayedCall(1000, () => {
-                    if (this.player && this.player.active) {
-                        this.player.setAlpha(1);
-                        this.isInvincible = false;
-                    }
-                });
-            } else {
-                this.hitTrap();
-            }
+            this.takeDamage();
         }
     }
     
@@ -757,46 +1190,55 @@ class GameScene extends Phaser.Scene {
     
     reachGoal() {
         if (!this.player.active) return;
-
+    
         if (this.dailyChallenge.type === 'time') {
             this.checkChallengeCompletion();
         }
-
-        this.tweens.killTweensOf(this.player);
+    
+        // Stop all dynamic elements for a clean transition
         this.physics.pause();
+        this.tweens.killAll();
+        this.time.removeAllEvents();
+    
         this.player.active = false;
         this.player.setTint(0x00ff00);
-        
+    
         const nextLevelIndex = this.levelIndex + 1;
         const isLastLevel = nextLevelIndex >= LEVELS.length;
-
+    
         if (!isLastLevel) {
             const currentUnlocked = parseInt(localStorage.getItem('ultimateLevelChallenge_unlockedLevel') || '0', 10);
             if (nextLevelIndex > currentUnlocked) {
                 localStorage.setItem('ultimateLevelChallenge_unlockedLevel', nextLevelIndex.toString());
             }
         }
-
+    
         const message = isLastLevel ? 'You Win!' : 'Level Complete!';
-        const winText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2, message, { fontSize: '64px', color: '#f6e05e', fontStyle: 'bold' }).setOrigin(0.5);
+        const winText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2, message, {
+            fontSize: '64px',
+            color: '#f6e05e',
+            fontStyle: 'bold'
+        }).setOrigin(0.5);
         winText.setScrollFactor(0);
-
+    
+        // Create a new timer specifically for the transition
         this.time.delayedCall(2000, () => {
             this.scene.stop('UIScene');
-             if (isLastLevel) {
+            if (isLastLevel) {
                 this.scene.start('MainMenuScene');
             } else {
                 const currentScore = this.registry.get('score');
-                this.scene.start('GameScene', { 
-                    challenge: this.dailyChallenge, 
-                    isCompleted: this.isCompletedForSession, 
+                // Restarting the scene will create a fresh state for the next level
+                this.scene.start('GameScene', {
+                    challenge: this.dailyChallenge,
+                    isCompleted: this.isCompletedForSession,
                     levelIndex: nextLevelIndex,
                     score: currentScore
                 });
-                this.scene.start('UIScene', { 
-                    challenge: this.dailyChallenge, 
-                    isCompleted: this.isCompletedForSession, 
-                    levelIndex: nextLevelIndex 
+                this.scene.start('UIScene', {
+                    challenge: this.dailyChallenge,
+                    isCompleted: this.isCompletedForSession,
+                    levelIndex: nextLevelIndex
                 });
             }
         });
@@ -846,6 +1288,297 @@ class GameScene extends Phaser.Scene {
             this.events.emit('challengeCompleted');
         }
     }
+
+    // Hazard Methods
+    triggerFallingRock(player: Phaser.Types.Physics.Arcade.GameObjectWithBody, spawner: Phaser.Types.Physics.Arcade.GameObjectWithBody) {
+        const spawnerSprite = spawner as Phaser.Physics.Arcade.Sprite;
+        const lastTrigger = spawnerSprite.getData('lastTrigger') || 0;
+        if (this.time.now < lastTrigger + 2000) return; // 2 second cooldown
+
+        spawnerSprite.setData('lastTrigger', this.time.now);
+        const rock = this.fallingRocks.create((player as Phaser.Physics.Arcade.Sprite).x, spawnerSprite.y, 'falling_rock');
+        rock.body.setSize(rock.width * 0.8, rock.height * 0.8);
+    }
+    
+    hitByHazard(player: Phaser.Types.Physics.Arcade.GameObjectWithBody, rock: Phaser.Types.Physics.Arcade.GameObjectWithBody) {
+        (rock as Phaser.Physics.Arcade.Sprite).destroy();
+        this.takeDamage();
+    }
+    
+    hitByGeyser(player: Phaser.Types.Physics.Arcade.GameObjectWithBody, geyser: Phaser.Types.Physics.Arcade.GameObjectWithBody) {
+        if (this.isInvincible) return;
+        
+        this.player.setVelocityY(PLAYER_JUMP_VELOCITY * 0.9);
+        this.canDoubleJump = false; // Prevent double jumping out of a geyser boost
+        this.takeDamage();
+    }
+    
+    // Visual Effects Methods
+    spawnDrip(x: number, y: number) {
+        if (!this.scene.isActive()) return;
+        const drip = this.drips.create(x, y, 'drip');
+        drip.setVelocityX(Phaser.Math.Between(-10, 10));
+    }
+
+    handleDripSplash(drip: Phaser.Types.Physics.Arcade.GameObjectWithBody, platform: Phaser.Types.Physics.Arcade.GameObjectWithBody) {
+        const dripSprite = drip as Phaser.Physics.Arcade.Sprite;
+        const splash = this.add.sprite(dripSprite.x, dripSprite.y, 'splash').setOrigin(0.5, 1);
+        dripSprite.destroy();
+
+        this.tweens.add({
+            targets: splash,
+            scale: 1.5,
+            alpha: 0,
+            duration: 400,
+            ease: 'Cubic.easeOut',
+            onComplete: () => {
+                splash.destroy();
+            }
+        });
+    }
+
+    // Boss Methods
+    startBossAttacks() {
+        this.attackTimer = this.time.addEvent({
+            delay: 2000,
+            callback: this.bossAttack,
+            callbackScope: this,
+            loop: true
+        });
+    }
+
+    bossAttack() {
+        if (!this.boss || !this.boss.active) {
+            this.attackTimer?.remove();
+            return;
+        }
+
+        if (this.boss.getData('isAttacking')) {
+            return; // Don't start a new attack if one is in progress (during a 'tell')
+        }
+
+        const phase = this.bossHealth > BOSS_HEALTH / 2 ? 1 : 2;
+
+        switch (this.bossAttackPattern) {
+            case 1: // First Boss
+                if (phase === 1) {
+                    if (Phaser.Math.Between(1, 10) <= 7) {
+                        this.bossThrowProjectile();
+                    } else {
+                        this.bossCharge();
+                    }
+                } else { // Phase 2
+                    if (Phaser.Math.Between(1, 10) <= 5) {
+                        this.bossThrowProjectile();
+                        this.time.delayedCall(200, this.bossThrowProjectile, [], this);
+                    } else {
+                        this.bossCharge();
+                    }
+                }
+                break;
+            case 2: // Second Boss
+                const attackType = Phaser.Math.Between(1, 3);
+                if (attackType === 1) {
+                    this.bossThrowSpreadProjectile(phase === 1 ? 3 : 5);
+                } else if (attackType === 2) {
+                    this.bossThrowHomingProjectile();
+                } else {
+                    this.bossCharge();
+                }
+                break;
+        }
+    }
+
+    bossThrowProjectile() {
+        if (!this.boss || !this.boss.active || !this.player.active) return;
+        
+        this.boss.setData('isAttacking', true);
+        this.boss.setTint(0xf6e05e); // Yellow tint for regular throw
+    
+        this.time.delayedCall(400, () => {
+            if (!this.boss || !this.boss.active) {
+                this.boss?.setData('isAttacking', false);
+                return;
+            }
+    
+            this.boss.clearTint();
+            const projectile = this.projectiles.create(this.boss.x, this.boss.y, 'projectile');
+            projectile.body.onWorldBounds = true;
+            this.physics.moveToObject(projectile, this.player, 400);
+            
+            this.boss.setData('isAttacking', false);
+        });
+    }
+
+    bossThrowSpreadProjectile(count: number) {
+        if (!this.boss || !this.boss.active || !this.player.active) return;
+        
+        this.boss.setData('isAttacking', true);
+        this.boss.setTint(0xed8936); // Orange for spread
+        this.tweens.add({
+            targets: this.boss,
+            scale: 1.1,
+            duration: 300,
+            yoyo: true,
+            ease: 'Power1'
+        });
+    
+        this.time.delayedCall(600, () => {
+            if (!this.boss || !this.boss.active) {
+                this.boss?.setData('isAttacking', false);
+                return;
+            }
+    
+            this.boss.clearTint();
+            const centerAngle = Phaser.Math.Angle.Between(this.boss.x, this.boss.y, this.player.x, this.player.y);
+            const spreadAngle = Phaser.Math.DegToRad(15);
+            const startAngle = centerAngle - (spreadAngle * (count - 1)) / 2;
+    
+            for (let i = 0; i < count; i++) {
+                const angle = startAngle + i * spreadAngle;
+                const projectile = this.projectiles.create(this.boss.x, this.boss.y, 'projectile');
+                projectile.setScale(0.8);
+                this.physics.velocityFromRotation(angle, 450, projectile.body.velocity);
+            }
+    
+            this.boss.setData('isAttacking', false);
+        });
+    }
+
+    bossThrowHomingProjectile() {
+        if (!this.boss || !this.boss.active) return;
+        
+        this.boss.setData('isAttacking', true);
+        this.boss.setTint(0x9f7aea); // Purple for homing
+    
+        const sparkle = this.add.sprite(this.boss.x, this.boss.y - 60, 'sparkle').setAlpha(0);
+    
+        this.tweens.add({
+            targets: sparkle,
+            alpha: 1,
+            scale: 2,
+            angle: 180,
+            duration: 400,
+            yoyo: true,
+            repeat: 0
+        });
+    
+        this.time.delayedCall(800, () => {
+            sparkle.destroy();
+            if (!this.boss || !this.boss.active) {
+                this.boss?.setData('isAttacking', false);
+                return;
+            }
+    
+            this.boss.clearTint();
+            const projectile = this.homingProjectiles.create(this.boss.x, this.boss.y, 'projectile_homing');
+            this.physics.moveToObject(projectile, this.player, 300);
+            
+            this.time.delayedCall(5000, () => {
+                if (projectile.active) {
+                    projectile.destroy();
+                }
+            });
+    
+            this.boss.setData('isAttacking', false);
+        });
+    }
+    
+    bossCharge() {
+        if (!this.boss || !this.boss.active) return;
+    
+        this.boss.setData('isAttacking', true);
+        this.boss.setTint(0xff6666); // Red tint
+        this.tweens.add({
+            targets: this.boss,
+            scaleX: 1.1,
+            scaleY: 0.9,
+            duration: 250,
+            yoyo: true,
+            ease: 'Power1',
+        });
+    
+        this.time.delayedCall(500, () => {
+            if (!this.boss || !this.boss.active) {
+                this.boss?.setData('isAttacking', false);
+                return;
+            }
+    
+            this.boss.clearTint();
+            const chargeSpeed = 800;
+            const targetX = this.player.x;
+            this.boss.setVelocityX(targetX < this.boss.x ? -chargeSpeed : chargeSpeed);
+            
+            this.time.delayedCall(800, () => {
+                if (this.boss && this.boss.active) {
+                    this.boss.setVelocityX(0);
+                }
+                this.time.delayedCall(200, () => {
+                    this.boss?.setData('isAttacking', false);
+                });
+            });
+        });
+    }
+
+    hitBoss(player: Phaser.Types.Physics.Arcade.GameObjectWithBody, boss: Phaser.Types.Physics.Arcade.GameObjectWithBody) {
+        if (this.isInvincible) return;
+
+        const playerSprite = player as Phaser.Physics.Arcade.Sprite;
+        playerSprite.setVelocityY(-400);
+
+        this.bossHealth--;
+        this.events.emit('bossHealthChanged', { currentHealth: this.bossHealth });
+
+        this.boss?.setTint(0xff0000);
+        this.time.delayedCall(100, () => {
+            this.boss?.clearTint();
+        });
+
+        if (this.bossHealth <= 0) {
+            this.bossDie();
+        } else if (this.bossHealth === BOSS_HEALTH / 2) {
+            // Phase change visual effect
+            this.boss?.setTint(0xffff00);
+            this.time.delayedCall(500, () => this.boss?.clearTint());
+            this.attackTimer?.remove();
+            this.attackTimer = this.time.addEvent({
+                delay: 1200, // Faster attacks in phase 2
+                callback: this.bossAttack,
+                callbackScope: this,
+                loop: true
+            });
+        }
+    }
+    
+    hitByProjectile(player: Phaser.Types.Physics.Arcade.GameObjectWithBody, projectile: Phaser.Types.Physics.Arcade.GameObjectWithBody) {
+        (projectile as Phaser.Physics.Arcade.Sprite).destroy();
+        this.takeDamage();
+    }
+
+    bossDie() {
+        if (!this.boss) return;
+        this.attackTimer?.remove();
+        this.boss.disableBody(true, false);
+
+        this.events.emit('bossDefeated');
+
+        this.tweens.add({
+            targets: this.boss,
+            alpha: 0,
+            scale: 2,
+            angle: 360,
+            duration: 500,
+            onComplete: () => {
+                this.boss?.destroy();
+            }
+        });
+
+        const level = LEVELS[this.levelIndex];
+        this.time.delayedCall(1000, () => {
+            this.goal = this.physics.add.staticSprite(level.goal.x, level.goal.y, 'goal');
+            this.physics.add.overlap(this.player, this.goal, this.reachGoal, undefined, this);
+        });
+    }
 }
 
 class UIScene extends Phaser.Scene {
@@ -860,6 +1593,11 @@ class UIScene extends Phaser.Scene {
     private dailyChallenge: any;
     private isChallengeCompleted = false;
     private levelIndex = 0;
+
+    // Boss UI
+    private bossHealthBar?: Phaser.GameObjects.Graphics;
+    private bossHealthBarBg?: Phaser.GameObjects.Graphics;
+    private bossNameText?: Phaser.GameObjects.Text;
 
     constructor() {
         super({ key: 'UIScene' });
@@ -959,6 +1697,56 @@ class UIScene extends Phaser.Scene {
             this.challengeText.setText('Challenge: Completed');
             this.challengeText.setColor('#48bb78');
         });
+
+        // Boss UI Listeners
+        gameScene.events.on('bossSpawned', this.createBossUI, this);
+        gameScene.events.on('bossHealthChanged', this.updateBossHealth, this);
+        gameScene.events.on('bossDefeated', this.destroyBossUI, this);
+    }
+    
+    createBossUI(data: { maxHealth: number, currentHealth: number }) {
+        const barWidth = 400;
+        const barHeight = 25;
+        const x = GAME_WIDTH / 2 - barWidth / 2;
+        const y = 50;
+
+        this.bossHealthBarBg = this.add.graphics();
+        this.bossHealthBarBg.fillStyle(0x2d3748, 0.8);
+        this.bossHealthBarBg.fillRoundedRect(x, y, barWidth, barHeight, 8);
+
+        this.bossHealthBar = this.add.graphics();
+        this.updateBossHealth({ currentHealth: data.currentHealth });
+
+        this.bossNameText = this.add.text(GAME_WIDTH / 2, y - 5, 'Jungle Gorilla', {
+            fontSize: '28px',
+            color: '#f7fafc',
+            fontStyle: 'bold',
+            stroke: '#2d3748',
+            strokeThickness: 5
+        }).setOrigin(0.5);
+    }
+
+    updateBossHealth(data: { currentHealth: number }) {
+        if (!this.bossHealthBar) return;
+
+        const percentage = Math.max(0, data.currentHealth / BOSS_HEALTH);
+        const barWidth = 400;
+        const barHeight = 25;
+        const x = GAME_WIDTH / 2 - barWidth / 2;
+        const y = 50;
+
+        this.bossHealthBar.clear();
+        this.bossHealthBar.fillStyle(percentage > 0.5 ? 0x48bb78 : (percentage > 0.2 ? 0xf6e05e : 0xc53030));
+        this.bossHealthBar.fillRoundedRect(x, y, barWidth * percentage, barHeight, 8);
+    }
+
+    destroyBossUI() {
+        this.bossHealthBar?.destroy();
+        this.bossHealthBarBg?.destroy();
+        this.bossNameText?.destroy();
+        this.bossHealthBar = undefined;
+        this.bossHealthBarBg = undefined;
+        this.bossNameText = undefined;
     }
 }
 
