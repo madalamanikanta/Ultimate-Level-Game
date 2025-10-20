@@ -1,5 +1,31 @@
+
 import Phaser from 'phaser';
-import { GAME_WIDTH, GAME_HEIGHT, PLAYER_SPEED, PLAYER_JUMP_VELOCITY, GRAVITY, SPEED_BOOST_MODIFIER, SPEED_BOOST_DURATION, JUMP_BOOST_MODIFIER, JUMP_BOOST_DURATION, ENEMY_SPEED, CHALLENGES, DAILY_CHALLENGE_REWARD, LEVELS, DASH_VELOCITY, DASH_DURATION, DASH_COOLDOWN, BOSS_HEALTH } from './constants';
+import { GAME_WIDTH, GAME_HEIGHT, PLAYER_SPEED, PLAYER_JUMP_VELOCITY, GRAVITY, SPEED_BOOST_MODIFIER, SPEED_BOOST_DURATION, JUMP_BOOST_MODIFIER, JUMP_BOOST_DURATION, ENEMY_SPEED, CHALLENGES, DAILY_CHALLENGE_REWARD, LEVELS, DASH_VELOCITY, DASH_DURATION, DASH_COOLDOWN, BOSS_HEALTH, TURTLE_ROLL_SPEED, COSMETICS } from './constants';
+
+// Helper functions for managing cosmetic data in localStorage
+const getCosmeticsData = () => {
+    try {
+        const data = localStorage.getItem('ultimateLevelChallenge_cosmetics');
+        if (data) {
+            return JSON.parse(data);
+        }
+    } catch (e) {
+        console.error("Failed to parse cosmetics data", e);
+    }
+    // Default data if none exists
+    return {
+        unlocked: ['outfit_default', 'hat_none'],
+        equipped: {
+            outfit: 'outfit_default',
+            hat: 'hat_none'
+        }
+    };
+};
+
+const saveCosmeticsData = (data: any) => {
+    localStorage.setItem('ultimateLevelChallenge_cosmetics', JSON.stringify(data));
+};
+
 
 class MainMenuScene extends Phaser.Scene {
     add!: Phaser.GameObjects.GameObjectFactory;
@@ -31,6 +57,49 @@ class MainMenuScene extends Phaser.Scene {
         }
         bgGraphics.generateTexture('background', GAME_WIDTH, GAME_HEIGHT);
         bgGraphics.destroy();
+        
+        // Pre-generate cosmetic hat textures
+        const fedoraGraphics = this.make.graphics();
+        fedoraGraphics.fillStyle(0x8b5a2b);
+        fedoraGraphics.slice(16, 12, 14, Phaser.Math.DegToRad(200), Phaser.Math.DegToRad(340), true).fillPath();
+        fedoraGraphics.fillStyle(0x2d3748);
+        fedoraGraphics.fillRect(4, 11, 24, 4);
+        fedoraGraphics.generateTexture('hat_fedora', 32, 16);
+        fedoraGraphics.destroy();
+
+        const pithGraphics = this.make.graphics();
+        pithGraphics.fillStyle(0xf0e68c);
+        pithGraphics.fillEllipse(16, 8, 30, 14);
+        pithGraphics.fillStyle(0x6b4a2b);
+        pithGraphics.fillRect(2, 7, 28, 3);
+        pithGraphics.generateTexture('hat_pith', 32, 16);
+        pithGraphics.destroy();
+        
+        const tophatGraphics = this.make.graphics();
+        tophatGraphics.fillStyle(0x2d3748);
+        tophatGraphics.fillRect(0, 12, 32, 4);
+        tophatGraphics.fillRect(6, 0, 20, 12);
+        tophatGraphics.fillStyle(0xc53030);
+        tophatGraphics.fillRect(6, 9, 20, 3);
+        tophatGraphics.generateTexture('hat_tophat', 32, 16);
+        tophatGraphics.destroy();
+        
+        const crownGraphics = this.make.graphics();
+        crownGraphics.fillStyle(0xf6e05e);
+        crownGraphics.beginPath();
+        crownGraphics.moveTo(4, 14);
+        crownGraphics.lineTo(4, 2);
+        crownGraphics.lineTo(10, 8);
+        crownGraphics.lineTo(16, 2);
+        crownGraphics.lineTo(22, 8);
+        crownGraphics.lineTo(28, 2);
+        crownGraphics.lineTo(28, 14);
+        crownGraphics.closePath();
+        crownGraphics.fillPath();
+        crownGraphics.fillStyle(0xc53030);
+        crownGraphics.fillCircle(16, 12, 3);
+        crownGraphics.generateTexture('hat_crown', 32, 16);
+        crownGraphics.destroy();
     }
 
     create() {
@@ -52,36 +121,183 @@ class MainMenuScene extends Phaser.Scene {
         const today = new Date().toDateString();
         const isCompleted = lastCompletion === today;
 
-        this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 50, 'Daily Challenge:', {
+        this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 80, 'Daily Challenge:', {
             fontSize: '32px',
             color: '#2d3748',
             fontStyle: 'bold'
         }).setOrigin(0.5);
         
-        this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2, todayChallenge.description, {
+        this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 30, todayChallenge.description, {
             fontSize: '28px',
             color: '#1a202c',
             fontStyle: 'bold'
         }).setOrigin(0.5);
 
         if (isCompleted) {
-             this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 40, '(Completed)', {
+             this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 10, '(Completed)', {
                 fontSize: '24px',
                 color: '#38a169',
                 fontStyle: 'bold'
             }).setOrigin(0.5);
         }
 
-
-        this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 150, 'Click to Start', {
+        const startButton = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 100, 'Start Game', {
             fontSize: '32px',
-            color: '#2d3748',
-            fontStyle: 'bold'
-        }).setOrigin(0.5);
-
-        this.input.once('pointerdown', () => {
+            color: '#f7fafc',
+            fontStyle: 'bold',
+            backgroundColor: '#8b5a2b',
+            padding: { x: 20, y: 10 },
+        }).setOrigin(0.5).setInteractive();
+        
+        startButton.on('pointerover', () => startButton.setBackgroundColor('#6b4a2b'));
+        startButton.on('pointerout', () => startButton.setBackgroundColor('#8b5a2b'));
+        startButton.on('pointerdown', () => {
             this.scene.start('LevelSelectScene', { challenge: todayChallenge, isCompleted: isCompleted });
         });
+        
+        const customizeButton = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 170, 'Customize', {
+            fontSize: '32px',
+            color: '#f7fafc',
+            fontStyle: 'bold',
+            backgroundColor: '#4a5568',
+            padding: { x: 20, y: 10 },
+        }).setOrigin(0.5).setInteractive();
+
+        customizeButton.on('pointerover', () => customizeButton.setBackgroundColor('#2d3748'));
+        customizeButton.on('pointerout', () => customizeButton.setBackgroundColor('#4a5568'));
+        customizeButton.on('pointerdown', () => {
+            this.scene.start('CustomizationScene');
+        });
+    }
+}
+
+class CustomizationScene extends Phaser.Scene {
+    add!: Phaser.GameObjects.GameObjectFactory;
+    input!: Phaser.Input.InputPlugin;
+    scene!: Phaser.Scenes.ScenePlugin;
+    make!: Phaser.GameObjects.GameObjectCreator;
+
+    private cosmeticsData: any;
+    private currentSelection: any;
+    private previewAvatar!: Phaser.GameObjects.Sprite;
+    private previewHat?: Phaser.GameObjects.Sprite;
+    
+    constructor() {
+        super({ key: 'CustomizationScene' });
+    }
+
+    create() {
+        this.add.image(0, 0, 'background').setOrigin(0);
+
+        this.cosmeticsData = getCosmeticsData();
+        this.currentSelection = { ...this.cosmeticsData.equipped };
+
+        this.add.text(GAME_WIDTH / 2, 80, 'Customize Your Explorer', {
+            fontSize: '64px',
+            color: '#f7fafc',
+            fontStyle: 'bold',
+            stroke: '#2d3748',
+            strokeThickness: 8
+        }).setOrigin(0.5);
+
+        // Preview Area
+        this.add.text(320, 180, 'Preview', { fontSize: '48px', color: '#2d3748', fontStyle: 'bold' }).setOrigin(0.5);
+        const previewBg = this.add.graphics();
+        previewBg.fillStyle(0xedf2f7, 0.5);
+        previewBg.fillRoundedRect(120, 220, 400, 400, 16);
+        this.previewAvatar = this.add.sprite(320, 420, 'avatar_idle').setScale(4);
+        this.previewHat = this.add.sprite(320, 420 - 64, 'hat_fedora').setScale(4).setVisible(false);
+        
+        // Selection Area
+        const selectionX = 700;
+        const outfits = COSMETICS.filter(c => c.type === 'outfit');
+        const hats = COSMETICS.filter(c => c.type === 'hat');
+        
+        this.createSelectionList('Outfits', outfits, selectionX, 220);
+        this.createSelectionList('Hats', hats, selectionX, 450);
+
+        // Save Button
+        const saveButton = this.add.text(GAME_WIDTH - 150, GAME_HEIGHT - 70, 'Save & Exit', {
+             fontSize: '32px', color: '#f7fafc', fontStyle: 'bold', backgroundColor: '#38a169', padding: {x: 15, y: 10}
+        }).setOrigin(0.5).setInteractive();
+
+        saveButton.on('pointerover', () => saveButton.setBackgroundColor('#2f855a'));
+        saveButton.on('pointerout', () => saveButton.setBackgroundColor('#38a169'));
+        saveButton.on('pointerdown', () => {
+            this.cosmeticsData.equipped = this.currentSelection;
+            saveCosmeticsData(this.cosmeticsData);
+            this.scene.start('MainMenuScene');
+        });
+        
+        this.updatePreview();
+    }
+    
+    createSelectionList(title: string, items: any[], x: number, y: number) {
+        this.add.text(x, y - 20, title, { fontSize: '32px', color: '#2d3748', fontStyle: 'bold' });
+
+        const itemsPerRow = 5;
+        const buttonSize = 80;
+        const spacing = 20;
+
+        items.forEach((item, index) => {
+            const isUnlocked = this.cosmeticsData.unlocked.includes(item.id);
+            const isEquipped = this.currentSelection[item.type] === item.id;
+            
+            const row = Math.floor(index / itemsPerRow);
+            const col = index % itemsPerRow;
+            const buttonX = x + col * (buttonSize + spacing);
+            const buttonY = y + 40 + row * (buttonSize + spacing);
+
+            const container = this.add.container(buttonX, buttonY);
+            const buttonBg = this.add.graphics();
+            buttonBg.lineStyle(4, isEquipped ? 0xf6e05e : (isUnlocked ? 0x2d3748 : 0xa0aec0));
+            buttonBg.fillStyle(isUnlocked ? 0xedf2f7 : 0x718096, 0.8);
+            buttonBg.fillRoundedRect(-buttonSize/2, -buttonSize/2, buttonSize, buttonSize, 8);
+            buttonBg.strokeRoundedRect(-buttonSize/2, -buttonSize/2, buttonSize, buttonSize, 8);
+            container.add(buttonBg);
+            
+            if (item.type === 'outfit') {
+                const swatch = this.add.graphics();
+                swatch.fillStyle(item.tint);
+                swatch.fillCircle(0, 0, 25);
+                container.add(swatch);
+            } else if (item.texture) {
+                const hatIcon = this.add.image(0, 0, item.texture).setScale(2);
+                container.add(hatIcon);
+            } else {
+                 const noHatText = this.add.text(0, 0, 'None', { fontSize: '20px', color: '#2d3748' }).setOrigin(0.5);
+                 container.add(noHatText);
+            }
+            
+            if (!isUnlocked) {
+                 const lockIcon = this.add.image(0, 0, 'lock_icon').setScale(1.5).setAlpha(0.9);
+                 container.add(lockIcon);
+            } else {
+                 container.setSize(buttonSize, buttonSize).setInteractive();
+                 container.on('pointerdown', () => {
+                     this.currentSelection[item.type] = item.id;
+                     // Redraw all buttons to update selection outline
+                     this.scene.restart();
+                 });
+            }
+        });
+    }
+
+    updatePreview() {
+        const outfit = COSMETICS.find(c => c.id === this.currentSelection.outfit);
+        const hat = COSMETICS.find(c => c.id === this.currentSelection.hat);
+
+        if (outfit) {
+            this.previewAvatar.setTint(outfit.tint);
+        }
+
+        if (this.previewHat) {
+            if (hat && hat.texture) {
+                this.previewHat.setTexture(hat.texture).setVisible(true);
+            } else {
+                this.previewHat.setVisible(false);
+            }
+        }
     }
 }
 
@@ -193,12 +409,14 @@ class LevelSelectScene extends Phaser.Scene {
                 buttonContainer.on('pointerdown', () => {
                     this.scene.start('GameScene', {
                         challenge: this.dailyChallenge,
+                        // FIX: Correct property name from isCompleted to isChallengeCompleted
                         isCompleted: this.isChallengeCompleted,
                         levelIndex: index,
                         score: 0
                     });
                     this.scene.start('UIScene', {
                         challenge: this.dailyChallenge,
+                        // FIX: Correct property name from isCompleted to isChallengeCompleted
                         isCompleted: this.isChallengeCompleted,
                         levelIndex: index
                     });
@@ -234,6 +452,7 @@ class GameScene extends Phaser.Scene {
     tweens!: Phaser.Tweens.TweenManager;
 
     private player!: Phaser.Physics.Arcade.Sprite;
+    private playerHat?: Phaser.GameObjects.Sprite;
     private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
     private platforms!: Phaser.Physics.Arcade.StaticGroup;
     private movingPlatforms!: Phaser.Physics.Arcade.Group;
@@ -248,6 +467,7 @@ class GameScene extends Phaser.Scene {
     private currentJumpVelocity = PLAYER_JUMP_VELOCITY;
     private isInvincible = false;
     private canDoubleJump = false;
+    private isHurt = false;
     
     // Dash Properties
     private shiftKey!: Phaser.Input.Keyboard.Key;
@@ -285,8 +505,25 @@ class GameScene extends Phaser.Scene {
     private playerInQuicksand = false;
 
     // Visual Effects
-    private vines!: Phaser.GameObjects.Group;
+    private vines!: Phaser.Physics.Arcade.Group;
     private drips!: Phaser.Physics.Arcade.Group;
+    
+    // Tutorial Properties
+    private tutorialTriggers!: Phaser.Physics.Arcade.StaticGroup;
+    private shownTutorials!: Set<string>;
+
+    // Pause Properties
+    private escapeKey!: Phaser.Input.Keyboard.Key;
+
+    // Vine Swinging Properties
+    private isSwinging = false;
+    private attachedVine: Phaser.Physics.Arcade.Sprite | null = null;
+    private swingAnchor: { x: number, y: number } | null = null;
+    private swingRadius = 0;
+    private swingAngle = 0;
+    private swingAngularVelocity = 0;
+    private grabbableVine: Phaser.Physics.Arcade.Sprite | null = null;
+    private grabCooldown = false;
 
 
     constructor() {
@@ -300,23 +537,90 @@ class GameScene extends Phaser.Scene {
         this.initialScore = data.score || 0;
         this.isBossLevel = false;
         this.boss = undefined;
+        this.isHurt = false;
+
+        // Load shown tutorials from localStorage
+        try {
+            const stored = localStorage.getItem('ultimateLevelChallenge_shownTutorials');
+            this.shownTutorials = stored ? new Set(JSON.parse(stored)) : new Set();
+        } catch (e) {
+            this.shownTutorials = new Set();
+        }
+    }
+
+    private drawPlayerFrame(key: string, drawCallback: (g: Phaser.GameObjects.Graphics) => void) {
+        const g = this.make.graphics({x: 0, y: 0});
+        drawCallback(g);
+        g.generateTexture(key, 64, 68);
+        g.destroy();
     }
 
     preload() {
-        // Avatar - Little Explorer
-        const avatarGraphics = this.make.graphics();
-        avatarGraphics.fillStyle(0x8b5a2b);
-        avatarGraphics.fillRect(16, 16, 32, 8);
-        avatarGraphics.fillRect(22, 8, 20, 8);
-        avatarGraphics.fillStyle(0xffd3a9);
-        avatarGraphics.fillRect(24, 24, 16, 16);
-        avatarGraphics.fillStyle(0x4a5568);
-        avatarGraphics.fillRect(20, 40, 24, 18);
-        avatarGraphics.fillStyle(0x5a3a22);
-        avatarGraphics.fillRect(22, 58, 8, 10);
-        avatarGraphics.fillRect(34, 58, 8, 10);
-        avatarGraphics.generateTexture('avatar', 64, 68);
-        avatarGraphics.destroy();
+        // Player animation frames
+        const drawBody = (g: Phaser.GameObjects.Graphics) => {
+            g.fillStyle(0x8b5a2b); // Torso/Arms base color
+            g.fillRect(22, 24, 20, 16);
+            g.fillStyle(0xffd3a9); // Head
+            g.fillRect(24, 8, 16, 16);
+            g.fillStyle(0x4a5568); // Shorts
+            g.fillRect(20, 40, 24, 18);
+        };
+
+        this.drawPlayerFrame('avatar_idle', g => {
+            drawBody(g);
+            g.fillStyle(0x5a3a22); // Boots
+            g.fillRect(22, 58, 8, 10);
+            g.fillRect(34, 58, 8, 10);
+        });
+
+        this.drawPlayerFrame('avatar_run_1', g => {
+            drawBody(g);
+            g.fillStyle(0x5a3a22); // Boots
+            g.fillRect(16, 58, 8, 10); // Back leg
+            g.fillRect(40, 58, 8, 10); // Front leg
+        });
+        
+        this.drawPlayerFrame('avatar_run_2', g => {
+            drawBody(g);
+            g.fillStyle(0x5a3a22); // Boots
+            g.fillRect(40, 58, 8, 10); // Back leg
+            g.fillRect(16, 58, 8, 10); // Front leg
+        });
+
+        this.drawPlayerFrame('avatar_jump', g => {
+            drawBody(g);
+            g.fillStyle(0x5a3a22); // Boots
+            g.fillRect(22, 52, 8, 8); // Tucked legs
+            g.fillRect(34, 52, 8, 8);
+        });
+
+        this.drawPlayerFrame('avatar_hurt', g => {
+            drawBody(g);
+            g.fillStyle(0x5a3a22); // Boots
+            g.fillRect(22, 58, 8, 10);
+            g.fillRect(34, 58, 8, 10);
+            // Add 'X' eyes for hurt state
+            g.lineStyle(2, 0x000000);
+            g.beginPath();
+            // Left eye
+            g.moveTo(26, 12); g.lineTo(30, 16);
+            g.moveTo(30, 12); g.lineTo(26, 16);
+            // Right eye
+            g.moveTo(34, 12); g.lineTo(38, 16);
+            g.moveTo(38, 12); g.lineTo(34, 16);
+            g.strokePath();
+        });
+
+        this.drawPlayerFrame('avatar_climb', g => {
+            drawBody(g);
+            g.fillStyle(0x8b5a2b); // Raised arms
+            g.fillRect(18, 16, 8, 8);
+            g.fillRect(38, 16, 8, 8);
+            g.fillStyle(0x5a3a22); // Boots
+            g.fillRect(22, 58, 8, 10);
+            g.fillRect(34, 58, 8, 10);
+        });
+
 
         // Platform - Mossy rock/wood
         const platformGraphics = this.make.graphics();
@@ -424,6 +728,21 @@ class GameScene extends Phaser.Scene {
         batGraphics.generateTexture('enemy_bat', 48, 48);
         batGraphics.destroy();
 
+        // Enemy - Spiky Turtle
+        const turtleGraphics = this.make.graphics();
+        turtleGraphics.fillStyle(0x8b5a2b); // brown body
+        turtleGraphics.fillEllipse(24, 28, 40, 20); // body
+        turtleGraphics.fillStyle(0x2f855a); // dark green shell
+        turtleGraphics.fillEllipse(24, 22, 36, 24); // shell
+        turtleGraphics.fillStyle(0xf6e05e); // yellow spikes
+        turtleGraphics.fillTriangle(16, 12, 12, 2, 20, 2);
+        turtleGraphics.fillTriangle(24, 15, 20, 5, 28, 5);
+        turtleGraphics.fillTriangle(32, 12, 28, 2, 36, 2);
+        turtleGraphics.fillStyle(0x000000); // eye
+        turtleGraphics.fillCircle(10, 26, 2);
+        turtleGraphics.generateTexture('enemy_turtle', 48, 48);
+        turtleGraphics.destroy();
+
         // Boss - Jungle Gorilla
         const bossGraphics = this.make.graphics();
         bossGraphics.fillStyle(0x5a3a22); // Dark brown fur
@@ -475,6 +794,13 @@ class GameScene extends Phaser.Scene {
         sparkleGraphics.fillPath();
         sparkleGraphics.generateTexture('sparkle', 16, 16);
         sparkleGraphics.destroy();
+
+        // Explosion Particle
+        const explosionParticleGraphics = this.make.graphics();
+        explosionParticleGraphics.fillStyle(0xf6e05e); // Yellow
+        explosionParticleGraphics.fillCircle(8, 8, 8);
+        explosionParticleGraphics.generateTexture('explosion_particle', 16, 16);
+        explosionParticleGraphics.destroy();
 
         // Power-ups
         const speedGraphics = this.make.graphics();
@@ -558,7 +884,6 @@ class GameScene extends Phaser.Scene {
         // Visual Effects
         const vineGraphics = this.make.graphics();
         vineGraphics.lineStyle(8, 0x2f855a);
-        // Fix: Use a Path object to draw the quadratic bezier curve, as the Graphics object does not have a `quadraticBezierTo` method.
         const vinePath = new Phaser.Curves.Path(10, 0);
         vinePath.quadraticBezierTo(20, 50, 10, 100);
         vinePath.quadraticBezierTo(0, 150, 10, 200);
@@ -630,11 +955,12 @@ class GameScene extends Phaser.Scene {
         }
         
         // Visual Effects Setup
-        this.vines = this.add.group();
+        this.vines = this.physics.add.group({ allowGravity: false });
         if (level.vines) {
             level.vines.forEach(v => {
-                const vine = this.vines.create(v.x, v.y, 'vine') as Phaser.GameObjects.Sprite;
-                vine.setOrigin(0.5, 0).setDepth(-1);
+                const vine = this.vines.create(v.x, v.y, 'vine') as Phaser.Physics.Arcade.Sprite;
+                vine.setOrigin(0.5, 0).refreshBody();
+                (vine.body as Phaser.Physics.Arcade.Body).setSize(10, vine.height);
             });
         }
         
@@ -650,8 +976,49 @@ class GameScene extends Phaser.Scene {
             });
         }
 
-        this.player = this.physics.add.sprite(level.playerStart.x, level.playerStart.y, 'avatar');
+        this.player = this.physics.add.sprite(level.playerStart.x, level.playerStart.y, 'avatar_idle');
         this.player.setCollideWorldBounds(true);
+        this.player.body.setSize(32, 60);
+        
+        // Create animations
+        this.anims.create({
+            key: 'idle',
+            frames: [{ key: 'avatar_idle' }],
+            frameRate: 1,
+        });
+        this.anims.create({
+            key: 'run',
+            frames: [{ key: 'avatar_run_1' }, { key: 'avatar_run_2' }],
+            frameRate: 10,
+            repeat: -1,
+        });
+        this.anims.create({
+            key: 'jump',
+            frames: [{ key: 'avatar_jump' }],
+            frameRate: 1,
+        });
+        this.anims.create({
+            key: 'hurt',
+            frames: [{ key: 'avatar_hurt' }],
+            frameRate: 1,
+        });
+        this.anims.create({
+            key: 'climb',
+            frames: [{ key: 'avatar_climb' }],
+            frameRate: 1,
+        });
+        
+        // Apply cosmetics
+        const cosmeticsData = getCosmeticsData();
+        const equippedOutfit = COSMETICS.find(c => c.id === cosmeticsData.equipped.outfit);
+        if (equippedOutfit) {
+            this.player.setTint(equippedOutfit.tint);
+        }
+        const equippedHat = COSMETICS.find(c => c.id === cosmeticsData.equipped.hat);
+        if (equippedHat && equippedHat.texture) {
+            this.playerHat = this.add.sprite(this.player.x, this.player.y - 32, equippedHat.texture).setOrigin(0.5, 1);
+        }
+
 
         this.coins = this.physics.add.group({ allowGravity: false });
         level.coins.forEach(c => {
@@ -724,6 +1091,12 @@ class GameScene extends Phaser.Scene {
                     enemy.setData('isSwooping', false);
                     enemy.setVelocityX(ENEMY_SPEED * 0.8);
                     enemy.setCollideWorldBounds(true);
+                } else if (e.type === 'turtle') {
+                    const enemy = this.enemies.create(e.x, e.y, 'enemy_turtle') as Phaser.Physics.Arcade.Sprite;
+                    enemy.setData('type', 'turtle');
+                    enemy.setData('isRolling', false);
+                    enemy.setCollideWorldBounds(true);
+                    (enemy.body as Phaser.Physics.Arcade.Body).setImmovable(true);
                 } else { // Default to snake
                     const enemy = this.enemies.create(e.x, e.y, 'enemy') as Phaser.Physics.Arcade.Sprite;
                     enemy.setData('type', 'snake');
@@ -755,6 +1128,7 @@ class GameScene extends Phaser.Scene {
         // Visuals Colliders
         this.physics.add.collider(this.drips, this.platforms, this.handleDripSplash, undefined, this);
         this.physics.add.collider(this.drips, this.movingPlatforms, this.handleDripSplash, undefined, this);
+        this.physics.add.overlap(this.player, this.vines, this.handleVineOverlap, undefined, this);
         
         // Boss Setup
         if (this.isBossLevel && level.boss) {
@@ -785,6 +1159,7 @@ class GameScene extends Phaser.Scene {
 
         this.cursors = this.input.keyboard.createCursorKeys();
         this.shiftKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT);
+        this.escapeKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
 
         this.registry.set('score', this.initialScore);
         this.events.emit('scoreChanged');
@@ -796,12 +1171,76 @@ class GameScene extends Phaser.Scene {
         this.isCompletedForSession = this.isChallengeCompleted;
         this.levelStartTime = this.time.now;
         this.events.emit('challengeProgressChanged', { progress: 0 });
+
+        // Tutorial Setup
+        this.tutorialTriggers = this.physics.add.staticGroup();
+        if (level.tutorials) {
+            level.tutorials.forEach(tut => {
+                if (this.shownTutorials.has(tut.id)) return;
+
+                if (tut.type === 'level_start') {
+                    this.time.delayedCall(500, () => this.displayHint(tut.text, tut.id));
+                } else if (tut.type === 'trigger_zone') {
+                    const zone = this.tutorialTriggers.create(tut.x, tut.y, undefined).setVisible(false);
+                    zone.setSize(tut.width, tut.height).setOrigin(0.5, 0.5);
+                    zone.setData('text', tut.text);
+                    zone.setData('id', tut.id);
+                    zone.refreshBody();
+                }
+            });
+        }
+        this.physics.add.overlap(this.player, this.tutorialTriggers, this.showTutorialHint, undefined, this);
     }
 
     update() {
+        this.grabbableVine = null;
+        if (Phaser.Input.Keyboard.JustDown(this.escapeKey)) {
+            this.scene.pause();
+            this.scene.pause('UIScene');
+            this.scene.launch('PauseScene', {
+                levelIndex: this.levelIndex,
+                challenge: this.dailyChallenge,
+                isCompleted: this.isChallengeCompleted,
+                score: this.initialScore
+            });
+            return;
+        }
+
         if (!this.player.active) return;
         
+        if (this.isSwinging) {
+            this.handleSwinging();
+            if (this.playerHat) {
+                this.playerHat.setPosition(this.player.x, this.player.y - 32);
+                this.playerHat.setRotation(this.player.rotation);
+                this.playerHat.setFlipX(this.player.flipX);
+            }
+            return;
+        }
+
+        const body = this.player.body as Phaser.Physics.Arcade.Body;
+        const onGround = body.touching.down || body.blocked.down;
+        
+        // --- Animation Control ---
+        if (!this.isHurt && !this.isDashing) {
+             if (this.isSwinging) {
+                this.player.anims.play('climb', true);
+            } else if (onGround) {
+                if (body.velocity.x !== 0) {
+                    this.player.anims.play('run', true);
+                } else {
+                    this.player.anims.play('idle', true);
+                }
+            } else {
+                this.player.anims.play('jump', true);
+            }
+        }
+
         if (this.isDashing) {
+            if (this.playerHat) {
+                this.playerHat.setPosition(this.player.x, this.player.y - 32);
+                this.playerHat.setFlipX(this.player.flipX);
+            }
             return; // Ignore other inputs while dashing
         }
         
@@ -820,10 +1259,10 @@ class GameScene extends Phaser.Scene {
             if (type === 'snake') {
                 if (enemy.body.blocked.right) {
                     enemy.setVelocityX(-ENEMY_SPEED);
-                    enemy.setFlipX(false);
+                    enemy.setFlipX(true);
                 } else if (enemy.body.blocked.left) {
                     enemy.setVelocityX(ENEMY_SPEED);
-                    enemy.setFlipX(true);
+                    enemy.setFlipX(false);
                 }
             } else if (type === 'bat') {
                 const isSwooping = enemy.getData('isSwooping');
@@ -878,6 +1317,33 @@ class GameScene extends Phaser.Scene {
                 if (enemy.body.velocity.x !== 0) {
                     enemy.setFlipX(enemy.body.velocity.x < 0);
                 }
+            } else if (type === 'turtle') {
+                const isRolling = enemy.getData('isRolling');
+
+                if (isRolling) {
+                    enemy.setAngularVelocity(enemy.body.velocity.x * 2.5); // Spin when rolling
+                    if (enemy.body.blocked.right) {
+                        enemy.setVelocityX(-TURTLE_ROLL_SPEED);
+                    } else if (enemy.body.blocked.left) {
+                        enemy.setVelocityX(TURTLE_ROLL_SPEED);
+                    }
+                } else { // Not rolling, check for player
+                    const distanceToPlayerX = Math.abs(this.player.x - enemy.x);
+                    const distanceToPlayerY = Math.abs(this.player.y - enemy.y);
+                    if (this.player.active && distanceToPlayerX < 300 && distanceToPlayerY < 50) {
+                        enemy.setData('isRolling', true);
+                        const rollSpeed = this.player.x < enemy.x ? -TURTLE_ROLL_SPEED : TURTLE_ROLL_SPEED;
+                        enemy.setVelocityX(rollSpeed);
+
+                        // "Tuck in" visual effect
+                        this.tweens.add({
+                            targets: enemy,
+                            scaleY: 0.8,
+                            duration: 100,
+                            ease: 'Power1'
+                        });
+                    }
+                }
             }
         });
         
@@ -887,7 +1353,8 @@ class GameScene extends Phaser.Scene {
             }
         });
 
-        // Vine swaying logic
+        // Vine swaying logic (no longer in use for swinging vines, but can be kept for background vines)
+        /*
         this.vines.getChildren().forEach(v => {
             const vine = v as Phaser.GameObjects.Sprite;
             const distance = Phaser.Math.Distance.Between(this.player.x, this.player.y, vine.x, vine.y);
@@ -907,6 +1374,7 @@ class GameScene extends Phaser.Scene {
                  this.tweens.add({ targets: vine, angle: 0, duration: 600, ease: 'Sine.easeInOut' });
             }
         });
+        */
 
         // Quicksand Logic
         let onQuicksand = false;
@@ -915,24 +1383,17 @@ class GameScene extends Phaser.Scene {
             onQuicksand = true;
             overlappingPit = pit as Phaser.Physics.Arcade.Sprite;
         });
-        
-        if (onQuicksand) {
+
+        this.playerInQuicksand = onQuicksand;
+
+        if (this.playerInQuicksand) {
             this.player.setVelocityX(this.player.body.velocity.x * 0.9);
-            if (this.player.body.velocity.y > 50) {
-                 this.player.setVelocityY(this.player.body.velocity.y * 0.9);
-            } else {
-                 this.player.setVelocityY(this.player.body.velocity.y + 15);
+            if (this.player.body.velocity.y < 150) {
+                this.player.setVelocityY(this.player.body.velocity.y + 20);
             }
-            if (!this.playerInQuicksand) {
-                 this.playerInQuicksand = true;
-            }
-            // Check if fully submerged
-            if(overlappingPit && this.player.getBounds().top > overlappingPit.getBounds().centerY) {
+            if (overlappingPit && this.player.getBounds().top > overlappingPit.getBounds().centerY) {
                 this.hitTrap();
             }
-
-        } else if (this.playerInQuicksand) {
-             this.playerInQuicksand = false;
         }
 
         if(this.isBossLevel && this.boss && this.boss.active) {
@@ -942,9 +1403,15 @@ class GameScene extends Phaser.Scene {
         if (this.shieldActive && this.shieldSprite) {
             this.shieldSprite.setPosition(this.player.x, this.player.y);
         }
-
-        const body = this.player.body as Phaser.Physics.Arcade.Body;
-        const onGround = body.touching.down || body.blocked.down;
+        
+        if (this.playerHat) {
+            this.playerHat.setPosition(this.player.x, this.player.y - 32);
+            this.playerHat.setFlipX(this.player.flipX);
+            if (!this.isSwinging) {
+                this.player.setRotation(0);
+                this.playerHat.setRotation(0);
+            }
+        }
 
         if (this.cursors.left.isDown) {
             this.player.setVelocityX(-this.currentSpeed);
@@ -955,7 +1422,7 @@ class GameScene extends Phaser.Scene {
             this.player.setFlipX(false);
             this.facingDirection = 'right';
         } else {
-            if (!onQuicksand) { // Don't stop immediately in quicksand
+            if (!onQuicksand) {
                 this.player.setVelocityX(0);
             }
         }
@@ -980,6 +1447,8 @@ class GameScene extends Phaser.Scene {
             if (onGround || onQuicksand) {
                 this.player.setVelocityY(this.currentJumpVelocity * (onQuicksand ? 0.7 : 1));
                 this.tweens.add({ targets: this.player, scaleY: 1.2, scaleX: 0.8, duration: 100, yoyo: true, ease: 'Power1' });
+            } else if (this.grabbableVine && !this.isSwinging && body.velocity.y >= 0) {
+                this.startSwinging(this.grabbableVine);
             } else if (this.canDoubleJump) {
                 this.player.setVelocityY(this.currentJumpVelocity * 0.85);
                 this.canDoubleJump = false;
@@ -1009,9 +1478,8 @@ class GameScene extends Phaser.Scene {
                 const angle = Phaser.Math.Angle.Between(projectile.x, projectile.y, this.player.x, this.player.y);
                 const currentVelocity = projectile.body.velocity.clone();
                 const targetVelocity = new Phaser.Math.Vector2();
-                this.physics.velocityFromRotation(angle, 300, targetVelocity); // Homing speed
+                this.physics.velocityFromRotation(angle, 300, targetVelocity);
                 
-                // Interpolate for smoother turning
                 const newVelocityX = Phaser.Math.Interpolation.Linear([currentVelocity.x, targetVelocity.x], 0.05);
                 const newVelocityY = Phaser.Math.Interpolation.Linear([currentVelocity.y, targetVelocity.y], 0.05);
                 
@@ -1041,11 +1509,13 @@ class GameScene extends Phaser.Scene {
             yoyo: true,
             ease: 'Sine.easeInOut'
         });
+        if (this.playerHat) {
+            this.tweens.add({ targets: this.playerHat, y: this.playerHat.y + 10, duration: DASH_DURATION / 2, yoyo: true, ease: 'Sine.easeInOut' });
+        }
 
         this.time.delayedCall(DASH_DURATION, () => {
             if (!this.player.active) return;
             this.isDashing = false;
-            // A short period of invincibility after dash
             this.time.delayedCall(100, () => { this.isInvincible = false; });
             (this.player.body as Phaser.Physics.Arcade.Body).setAllowGravity(true);
             this.player.setVelocityX(0); 
@@ -1161,10 +1631,16 @@ class GameScene extends Phaser.Scene {
 
         const playerSprite = player as Phaser.Physics.Arcade.Sprite;
         const enemySprite = enemy as Phaser.Physics.Arcade.Sprite;
+        const enemyType = enemySprite.getData('type');
+
+        if (enemyType === 'turtle' && enemySprite.getData('isRolling')) {
+            this.takeDamage();
+            return;
+        }
 
         if (playerSprite.body.velocity.y > 0 && playerSprite.y < enemySprite.y - (enemySprite.height * enemySprite.scaleY) / 2) {
             enemySprite.destroy();
-            playerSprite.setVelocityY(-300); // Bounce
+            playerSprite.setVelocityY(-300);
             if (this.dailyChallenge.type === 'enemy') {
                 this.challengeProgress++;
                 this.events.emit('challengeProgressChanged', { progress: this.challengeProgress });
@@ -1176,12 +1652,21 @@ class GameScene extends Phaser.Scene {
     }
     
     hitTrap() {
-        if (this.isInvincible || !this.player.active) return;
+        if (this.isInvincible || !this.player.active || this.isHurt) return;
+        this.isHurt = true;
         this.isInvincible = false;
         this.tweens.killTweensOf(this.player);
         this.physics.pause();
         this.player.active = false;
+        
+        if (this.isSwinging) {
+            this.stopSwinging(true);
+        }
+        
+        this.player.anims.play('hurt');
         this.player.setTint(0xff0000);
+        this.playerHat?.setTint(0xff0000);
+
         this.time.delayedCall(500, () => {
              this.scene.stop('UIScene');
              this.scene.start('GameOverScene');
@@ -1195,14 +1680,16 @@ class GameScene extends Phaser.Scene {
             this.checkChallengeCompletion();
         }
     
-        // Stop all dynamic elements for a clean transition
         this.physics.pause();
         this.tweens.killAll();
         this.time.removeAllEvents();
     
         this.player.active = false;
         this.player.setTint(0x00ff00);
+        this.playerHat?.setTint(0x00ff00);
     
+        this.checkForCosmeticUnlock();
+
         const nextLevelIndex = this.levelIndex + 1;
         const isLastLevel = nextLevelIndex >= LEVELS.length;
     
@@ -1221,14 +1708,12 @@ class GameScene extends Phaser.Scene {
         }).setOrigin(0.5);
         winText.setScrollFactor(0);
     
-        // Create a new timer specifically for the transition
         this.time.delayedCall(2000, () => {
             this.scene.stop('UIScene');
             if (isLastLevel) {
                 this.scene.start('MainMenuScene');
             } else {
                 const currentScore = this.registry.get('score');
-                // Restarting the scene will create a fresh state for the next level
                 this.scene.start('GameScene', {
                     challenge: this.dailyChallenge,
                     isCompleted: this.isCompletedForSession,
@@ -1240,6 +1725,41 @@ class GameScene extends Phaser.Scene {
                     isCompleted: this.isCompletedForSession,
                     levelIndex: nextLevelIndex
                 });
+            }
+        });
+    }
+
+    checkForCosmeticUnlock() {
+        const cosmeticsToUnlock = COSMETICS.filter(c => c.unlock.type === 'level' && c.unlock.value === this.levelIndex);
+        if (cosmeticsToUnlock.length > 0) {
+            const cosmeticsData = getCosmeticsData();
+            let newUnlock = false;
+            cosmeticsToUnlock.forEach(cosmetic => {
+                if (!cosmeticsData.unlocked.includes(cosmetic.id)) {
+                    cosmeticsData.unlocked.push(cosmetic.id);
+                    newUnlock = true;
+                    this.showUnlockMessage(`Unlocked: ${cosmetic.name}`);
+                }
+            });
+            if (newUnlock) {
+                saveCosmeticsData(cosmeticsData);
+            }
+        }
+    }
+    
+    showUnlockMessage(message: string) {
+        const unlockText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 150, message, {
+            fontSize: '48px',
+            color: '#4299e1',
+            fontStyle: 'bold',
+            align: 'center',
+            backgroundColor: '#1a202c'
+        }).setOrigin(0.5).setPadding(20);
+        unlockText.setScrollFactor(0);
+
+        this.time.delayedCall(2500, () => {
+            if (unlockText && unlockText.active) {
+                unlockText.destroy();
             }
         });
     }
@@ -1261,6 +1781,16 @@ class GameScene extends Phaser.Scene {
         if (completed) {
             this.isCompletedForSession = true;
             localStorage.setItem('challengeCompletedDate', new Date().toDateString());
+
+            const challengeCosmetic = COSMETICS.find(c => c.unlock.type === 'challenge');
+            if (challengeCosmetic) {
+                const cosmeticsData = getCosmeticsData();
+                if (!cosmeticsData.unlocked.includes(challengeCosmetic.id)) {
+                    cosmeticsData.unlocked.push(challengeCosmetic.id);
+                    saveCosmeticsData(cosmeticsData);
+                    this.showUnlockMessage(`Unlocked: ${challengeCosmetic.name}`);
+                }
+            }
             
             const currentScore = this.registry.get('score');
             this.registry.set('score', currentScore + DAILY_CHALLENGE_REWARD);
@@ -1293,7 +1823,7 @@ class GameScene extends Phaser.Scene {
     triggerFallingRock(player: Phaser.Types.Physics.Arcade.GameObjectWithBody, spawner: Phaser.Types.Physics.Arcade.GameObjectWithBody) {
         const spawnerSprite = spawner as Phaser.Physics.Arcade.Sprite;
         const lastTrigger = spawnerSprite.getData('lastTrigger') || 0;
-        if (this.time.now < lastTrigger + 2000) return; // 2 second cooldown
+        if (this.time.now < lastTrigger + 2000) return;
 
         spawnerSprite.setData('lastTrigger', this.time.now);
         const rock = this.fallingRocks.create((player as Phaser.Physics.Arcade.Sprite).x, spawnerSprite.y, 'falling_rock');
@@ -1309,7 +1839,7 @@ class GameScene extends Phaser.Scene {
         if (this.isInvincible) return;
         
         this.player.setVelocityY(PLAYER_JUMP_VELOCITY * 0.9);
-        this.canDoubleJump = false; // Prevent double jumping out of a geyser boost
+        this.canDoubleJump = false;
         this.takeDamage();
     }
     
@@ -1337,6 +1867,86 @@ class GameScene extends Phaser.Scene {
         });
     }
 
+    // Tutorial Methods
+    showTutorialHint(player: Phaser.Types.Physics.Arcade.GameObjectWithBody, trigger: Phaser.Types.Physics.Arcade.GameObjectWithBody) {
+        const triggerZone = trigger as Phaser.Physics.Arcade.Sprite;
+        const text = triggerZone.getData('text');
+        const id = triggerZone.getData('id');
+
+        if (text && id && !this.shownTutorials.has(id)) {
+            this.displayHint(text, id);
+            triggerZone.destroy();
+        }
+    }
+
+    displayHint(text: string, id: string) {
+        if (this.shownTutorials.has(id)) return;
+
+        this.shownTutorials.add(id);
+        localStorage.setItem('ultimateLevelChallenge_shownTutorials', JSON.stringify(Array.from(this.shownTutorials)));
+
+        const hintContainer = this.add.container(GAME_WIDTH / 2, 100).setAlpha(0);
+
+        const textObject = this.add.text(0, 0, text, {
+            fontSize: '28px',
+            color: '#f7fafc',
+            fontStyle: 'bold',
+            align: 'center',
+            wordWrap: { width: 450, useAdvancedWrap: true }
+        }).setOrigin(0.5);
+
+        const textBounds = textObject.getBounds();
+        const bgPadding = 20;
+
+        const bg = this.add.graphics();
+        bg.fillStyle(0x2d3748, 0.8);
+        bg.fillRoundedRect(
+            -textBounds.width / 2 - bgPadding,
+            -textBounds.height / 2 - bgPadding,
+            textBounds.width + bgPadding * 2,
+            textBounds.height + bgPadding * 2,
+            16
+        );
+        bg.lineStyle(2, 0x4a5568);
+        bg.strokeRoundedRect(
+            -textBounds.width / 2 - bgPadding,
+            -textBounds.height / 2 - bgPadding,
+            textBounds.width + bgPadding * 2,
+            textBounds.height + bgPadding * 2,
+            16
+        );
+
+        hintContainer.add(bg);
+        hintContainer.add(textObject);
+        hintContainer.setDepth(100);
+
+        this.tweens.chain({
+            targets: hintContainer,
+            tweens: [
+                {
+                    alpha: 1,
+                    y: 120,
+                    duration: 500,
+                    ease: 'Power2'
+                },
+                {
+                    delay: 4000,
+                    alpha: 1,
+                    duration: 1
+                },
+                {
+                    alpha: 0,
+                    y: 100,
+                    duration: 500,
+                    ease: 'Power2',
+                    onComplete: () => {
+                        hintContainer.destroy();
+                    }
+                }
+            ]
+        });
+    }
+
     // Boss Methods
     startBossAttacks() {
         this.attackTimer = this.time.addEvent({
@@ -1354,20 +1964,20 @@ class GameScene extends Phaser.Scene {
         }
 
         if (this.boss.getData('isAttacking')) {
-            return; // Don't start a new attack if one is in progress (during a 'tell')
+            return;
         }
 
         const phase = this.bossHealth > BOSS_HEALTH / 2 ? 1 : 2;
 
         switch (this.bossAttackPattern) {
-            case 1: // First Boss
+            case 1:
                 if (phase === 1) {
                     if (Phaser.Math.Between(1, 10) <= 7) {
                         this.bossThrowProjectile();
                     } else {
                         this.bossCharge();
                     }
-                } else { // Phase 2
+                } else {
                     if (Phaser.Math.Between(1, 10) <= 5) {
                         this.bossThrowProjectile();
                         this.time.delayedCall(200, this.bossThrowProjectile, [], this);
@@ -1376,7 +1986,7 @@ class GameScene extends Phaser.Scene {
                     }
                 }
                 break;
-            case 2: // Second Boss
+            case 2:
                 const attackType = Phaser.Math.Between(1, 3);
                 if (attackType === 1) {
                     this.bossThrowSpreadProjectile(phase === 1 ? 3 : 5);
@@ -1393,7 +2003,7 @@ class GameScene extends Phaser.Scene {
         if (!this.boss || !this.boss.active || !this.player.active) return;
         
         this.boss.setData('isAttacking', true);
-        this.boss.setTint(0xf6e05e); // Yellow tint for regular throw
+        this.boss.setTint(0xf6e05e);
     
         this.time.delayedCall(400, () => {
             if (!this.boss || !this.boss.active) {
@@ -1414,7 +2024,7 @@ class GameScene extends Phaser.Scene {
         if (!this.boss || !this.boss.active || !this.player.active) return;
         
         this.boss.setData('isAttacking', true);
-        this.boss.setTint(0xed8936); // Orange for spread
+        this.boss.setTint(0xed8936);
         this.tweens.add({
             targets: this.boss,
             scale: 1.1,
@@ -1449,7 +2059,7 @@ class GameScene extends Phaser.Scene {
         if (!this.boss || !this.boss.active) return;
         
         this.boss.setData('isAttacking', true);
-        this.boss.setTint(0x9f7aea); // Purple for homing
+        this.boss.setTint(0x9f7aea);
     
         const sparkle = this.add.sprite(this.boss.x, this.boss.y - 60, 'sparkle').setAlpha(0);
     
@@ -1488,7 +2098,7 @@ class GameScene extends Phaser.Scene {
         if (!this.boss || !this.boss.active) return;
     
         this.boss.setData('isAttacking', true);
-        this.boss.setTint(0xff6666); // Red tint
+        this.boss.setTint(0xff6666);
         this.tweens.add({
             targets: this.boss,
             scaleX: 1.1,
@@ -1537,12 +2147,11 @@ class GameScene extends Phaser.Scene {
         if (this.bossHealth <= 0) {
             this.bossDie();
         } else if (this.bossHealth === BOSS_HEALTH / 2) {
-            // Phase change visual effect
             this.boss?.setTint(0xffff00);
             this.time.delayedCall(500, () => this.boss?.clearTint());
             this.attackTimer?.remove();
             this.attackTimer = this.time.addEvent({
-                delay: 1200, // Faster attacks in phase 2
+                delay: 1200,
                 callback: this.bossAttack,
                 callbackScope: this,
                 loop: true
@@ -1558,26 +2167,155 @@ class GameScene extends Phaser.Scene {
     bossDie() {
         if (!this.boss) return;
         this.attackTimer?.remove();
+    
+        this.cameras.main.shake(500, 0.01); 
+    
         this.boss.disableBody(true, false);
-
         this.events.emit('bossDefeated');
-
-        this.tweens.add({
-            targets: this.boss,
-            alpha: 0,
-            scale: 2,
-            angle: 360,
-            duration: 500,
-            onComplete: () => {
-                this.boss?.destroy();
-            }
+    
+        this.boss.setVisible(false);
+    
+        const particles = this.add.particles(0, 0, 'explosion_particle', {
+            x: this.boss.x,
+            y: this.boss.y,
+            speed: { min: 150, max: 500 },
+            angle: { min: 0, max: 360 },
+            scale: { start: 1.2, end: 0 },
+            blendMode: 'ADD',
+            lifespan: 1000,
+            gravityY: 300
         });
-
+        particles.explode(100);
+    
+        this.time.delayedCall(1200, () => {
+            this.boss?.destroy();
+            particles.destroy();
+        });
+    
+        this.time.delayedCall(600, () => {
+            const victoryText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2, 'VICTORY!', {
+                fontSize: '128px',
+                color: '#f6e05e',
+                fontStyle: 'bold',
+                stroke: '#6b4a2b',
+                strokeThickness: 10
+            }).setOrigin(0.5).setScale(0);
+    
+            this.tweens.add({
+                targets: victoryText,
+                scale: 1,
+                duration: 800,
+                ease: 'Elastic.easeOut',
+                onComplete: () => {
+                    this.time.delayedCall(1500, () => victoryText.destroy());
+                }
+            });
+    
+            const showerDuration = 2200;
+            this.time.addEvent({
+                delay: 30,
+                repeat: showerDuration / 30,
+                callback: () => {
+                    if (!this.scene.isActive()) return;
+                    const x = Phaser.Math.Between(0, GAME_WIDTH);
+                    const banana = this.physics.add.sprite(x, -50, 'coin');
+                    banana.setVelocity(Phaser.Math.Between(-50, 50), Phaser.Math.Between(400, 700));
+                    (banana.body as Phaser.Physics.Arcade.Body).setAllowGravity(false);
+                    banana.setAngle(Phaser.Math.Between(-30, 30));
+                    banana.setAngularVelocity(Phaser.Math.Between(-180, 180));
+                    this.time.delayedCall(3000, () => {
+                        if (banana.active) banana.destroy();
+                    });
+                }
+            });
+        });
+    
         const level = LEVELS[this.levelIndex];
-        this.time.delayedCall(1000, () => {
+        this.time.delayedCall(3500, () => {
+            if (!this.scene.isActive()) return;
             this.goal = this.physics.add.staticSprite(level.goal.x, level.goal.y, 'goal');
             this.physics.add.overlap(this.player, this.goal, this.reachGoal, undefined, this);
         });
+    }
+
+    // Vine Swinging Methods
+    handleVineOverlap(player: Phaser.Types.Physics.Arcade.GameObjectWithBody, vine: Phaser.Types.Physics.Arcade.GameObjectWithBody) {
+        this.grabbableVine = vine as Phaser.Physics.Arcade.Sprite;
+    }
+
+    startSwinging(vine: Phaser.Physics.Arcade.Sprite) {
+        this.isSwinging = true;
+        this.attachedVine = vine;
+
+        (this.player.body as Phaser.Physics.Arcade.Body).setAllowGravity(false);
+        
+        this.swingAnchor = { x: vine.x, y: vine.y };
+        
+        const dx = this.player.x - this.swingAnchor.x;
+        const dy = this.player.y - this.swingAnchor.y;
+        this.swingRadius = Math.sqrt(dx * dx + dy * dy);
+        this.swingAngle = Math.atan2(dy, dx);
+        
+        const playerVel = this.player.body.velocity;
+        this.swingAngularVelocity = (playerVel.x * dy - playerVel.y * dx) / (this.swingRadius * this.swingRadius);
+
+        this.player.setVelocity(0, 0);
+
+        this.grabCooldown = true;
+        this.time.delayedCall(250, () => { this.grabCooldown = false; });
+    }
+
+    handleSwinging() {
+        if (!this.swingAnchor || !this.attachedVine || !this.player.active) {
+            this.stopSwinging(true); // Force stop if something is wrong
+            return;
+        }
+
+        if (Phaser.Input.Keyboard.JustDown(this.cursors.up) && !this.grabCooldown) {
+            this.stopSwinging();
+            return;
+        }
+
+        // Input to influence swing
+        if (this.cursors.left.isDown) {
+            this.swingAngularVelocity -= 0.0008;
+        } else if (this.cursors.right.isDown) {
+            this.swingAngularVelocity += 0.0008;
+        }
+
+        // Pendulum physics (gravity)
+        const swingForce = (GRAVITY / 1000000) * Math.cos(this.swingAngle);
+        this.swingAngularVelocity -= swingForce;
+        this.swingAngularVelocity *= 0.995; // Damping
+        this.swingAngle += this.swingAngularVelocity;
+
+        this.player.x = this.swingAnchor.x + Math.cos(this.swingAngle) * this.swingRadius;
+        this.player.y = this.swingAnchor.y + Math.sin(this.swingAngle) * this.swingRadius;
+        
+        this.player.setFlipX(this.swingAngularVelocity > 0);
+        this.player.setRotation(this.swingAngle - Math.PI / 2);
+        this.player.anims.play('climb', true);
+    }
+
+    stopSwinging(force = false) {
+        if (!this.isSwinging) return;
+
+        this.isSwinging = false;
+        this.attachedVine = null;
+
+        (this.player.body as Phaser.Physics.Arcade.Body).setAllowGravity(true);
+        this.player.setRotation(0);
+        
+        if (!force) {
+            const tangentialSpeed = this.swingAngularVelocity * this.swingRadius;
+            const releaseMultiplier = 60;
+            const releaseVx = tangentialSpeed * -Math.sin(this.swingAngle) * releaseMultiplier;
+            const releaseVy = tangentialSpeed * Math.cos(this.swingAngle) * releaseMultiplier;
+
+            this.player.setVelocity(releaseVx, releaseVy);
+            
+            this.canDoubleJump = true;
+        }
     }
 }
 
@@ -1750,6 +2488,77 @@ class UIScene extends Phaser.Scene {
     }
 }
 
+class PauseScene extends Phaser.Scene {
+    add!: Phaser.GameObjects.GameObjectFactory;
+    input!: Phaser.Input.InputPlugin;
+    scene!: Phaser.Scenes.ScenePlugin;
+
+    private restartData: any;
+
+    constructor() {
+        super({ key: 'PauseScene' });
+    }
+
+    init(data: any) {
+        this.restartData = data;
+    }
+
+    create() {
+        // Semi-transparent background
+        this.add.rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.7).setOrigin(0);
+
+        this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 150, 'Paused', {
+            fontSize: '64px',
+            color: '#f7fafc',
+            fontStyle: 'bold',
+            stroke: '#2d3748',
+            strokeThickness: 8
+        }).setOrigin(0.5);
+
+        const buttonStyle = {
+            fontSize: '40px',
+            color: '#f7fafc',
+            fontStyle: 'bold',
+            backgroundColor: '#4a5568',
+            padding: { x: 20, y: 10 },
+        };
+
+        const resumeButton = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 30, 'Resume', buttonStyle).setOrigin(0.5).setInteractive();
+        const restartButton = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 50, 'Restart Level', buttonStyle).setOrigin(0.5).setInteractive();
+        const mainMenuButton = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 130, 'Main Menu', buttonStyle).setOrigin(0.5).setInteractive();
+
+        resumeButton.on('pointerover', () => resumeButton.setBackgroundColor('#2d3748'));
+        resumeButton.on('pointerout', () => resumeButton.setBackgroundColor('#4a5568'));
+        resumeButton.on('pointerdown', () => this.resumeGame());
+
+        restartButton.on('pointerover', () => restartButton.setBackgroundColor('#2d3748'));
+        restartButton.on('pointerout', () => restartButton.setBackgroundColor('#4a5568'));
+        restartButton.on('pointerdown', () => {
+            this.scene.stop('GameScene');
+            this.scene.stop('UIScene');
+            this.scene.start('GameScene', this.restartData);
+            this.scene.start('UIScene', this.restartData);
+        });
+
+        mainMenuButton.on('pointerover', () => mainMenuButton.setBackgroundColor('#2d3748'));
+        mainMenuButton.on('pointerout', () => mainMenuButton.setBackgroundColor('#4a5568'));
+        mainMenuButton.on('pointerdown', () => {
+            this.scene.stop('GameScene');
+            this.scene.stop('UIScene');
+            this.scene.start('MainMenuScene');
+        });
+
+        // Also allow resuming with the Escape key
+        this.input.keyboard.once('keydown-ESC', this.resumeGame, this);
+    }
+
+    resumeGame() {
+        this.scene.resume('GameScene');
+        this.scene.resume('UIScene');
+        this.scene.stop();
+    }
+}
+
 class GameOverScene extends Phaser.Scene {
     add!: Phaser.GameObjects.GameObjectFactory;
     input!: Phaser.Input.InputPlugin;
@@ -1796,7 +2605,7 @@ const config: Phaser.Types.Core.GameConfig = {
         mode: Phaser.Scale.FIT,
         autoCenter: Phaser.Scale.CENTER_BOTH
     },
-    scene: [MainMenuScene, LevelSelectScene, GameScene, UIScene, GameOverScene]
+    scene: [MainMenuScene, CustomizationScene, LevelSelectScene, GameScene, UIScene, PauseScene, GameOverScene]
 };
 
 new Phaser.Game(config);

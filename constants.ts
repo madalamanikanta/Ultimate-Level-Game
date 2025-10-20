@@ -20,10 +20,27 @@ export const JUMP_BOOST_DURATION = 10000; // in ms
 
 // Enemy Constants
 export const ENEMY_SPEED = 100;
+export const TURTLE_ROLL_SPEED = 250;
 export const BOSS_HEALTH = 10;
 
 // Daily Challenge Constants
 export const DAILY_CHALLENGE_REWARD = 50;
+
+export const COSMETICS = [
+    // Outfits (Tints)
+    { id: 'outfit_default', name: 'Default Gear', type: 'outfit', unlock: { type: 'default' }, tint: 0xffffff },
+    { id: 'outfit_red', name: 'Ruby Garb', type: 'outfit', unlock: { type: 'level', value: 1 }, tint: 0xf56565 },
+    { id: 'outfit_blue', name: 'Sapphire Suit', type: 'outfit', unlock: { type: 'level', value: 3 }, tint: 0x4299e1 },
+    { id: 'outfit_green', name: 'Emerald Threads', type: 'outfit', unlock: { type: 'level', value: 6 }, tint: 0x48bb78 },
+    { id: 'outfit_gold', name: 'Golden Attire', type: 'outfit', unlock: { type: 'challenge' }, tint: 0xf6e05e },
+
+    // Hats
+    { id: 'hat_none', name: 'No Hat', type: 'hat', unlock: { type: 'default' }, texture: null },
+    { id: 'hat_fedora', name: 'Explorer Fedora', type: 'hat', unlock: { type: 'level', value: 0 }, texture: 'hat_fedora' },
+    { id: 'hat_pith', name: 'Pith Helmet', type: 'hat', unlock: { type: 'level', value: 2 }, texture: 'hat_pith' },
+    { id: 'hat_tophat', name: 'Dapper Top Hat', type: 'hat', unlock: { type: 'level', value: 5 }, texture: 'hat_tophat' },
+    { id: 'hat_crown', name: 'Gorilla Crown', type: 'hat', unlock: { type: 'level', value: 9 }, texture: 'hat_crown' },
+];
 
 export const CHALLENGES = [
     {
@@ -76,9 +93,17 @@ export const LEVELS = [
         enemies: [
             { type: 'snake', x: 850, y: GAME_HEIGHT - 280, velocityX: ENEMY_SPEED },
         ],
-        hazards: [],
-        vines: [ { x: 600, y: GAME_HEIGHT - 500 } ],
-        dripSpawners: [ { x: 800, y: 0 } ]
+        hazards: [
+             { type: 'quicksand', x: 650, y: GAME_HEIGHT - 20, width: 100, height: 40 }
+        ],
+        vines: [],
+        dripSpawners: [ { x: 800, y: 0 } ],
+        tutorials: [
+            { id: 'move', text: 'Use ◀️ and ▶️ Arrow Keys to Move', type: 'level_start' },
+            { id: 'jump', text: 'Press ▲ to Jump\nPress again in mid-air to Double Jump!', type: 'trigger_zone', x: 300, y: 650, width: 200, height: 100 },
+            { id: 'dash', text: 'Press SHIFT to Dash!\nYou are invincible while dashing.', type: 'trigger_zone', x: 600, y: 550, width: 200, height: 100 },
+            { id: 'enemy', text: 'Stomp on enemies from above to defeat them!', type: 'trigger_zone', x: 750, y: 400, width: 150, height: 150 }
+        ]
     },
     { // Level 2: Going Up (Original 2)
         playerStart: { x: 100, y: GAME_HEIGHT - 100 },
@@ -111,7 +136,13 @@ export const LEVELS = [
             { type: 'snake', x: 450, y: GAME_HEIGHT - 180, velocityX: -ENEMY_SPEED },
             { type: 'snake', x: 650, y: GAME_HEIGHT - 400, velocityX: ENEMY_SPEED },
         ],
-        hazards: []
+        hazards: [
+            { type: 'quicksand', x: 280, y: GAME_HEIGHT - 20, width: 120, height: 40 }
+        ],
+        vines: [],
+        tutorials: [
+            { id: 'jump_boost', text: 'This green frog grants a temporary JUMP BOOST!', type: 'trigger_zone', x: 620, y: 280, width: 100, height: 100 }
+        ]
     },
     { // Level 3: First Steps on Air (Original 6)
         playerStart: { x: 100, y: GAME_HEIGHT - 100 },
@@ -123,19 +154,27 @@ export const LEVELS = [
         movingPlatforms: [
             { x: 400, y: GAME_HEIGHT - 150, moveType: 'horizontal', distance: 300, duration: 4000 },
             { x: 800, y: GAME_HEIGHT - 300, moveType: 'vertical', distance: -150, duration: 2500 },
-            { x: 600, y: GAME_HEIGHT - 500, moveType: 'horizontal', distance: -300, duration: 3000 },
             { x: 300, y: 300, moveType: 'vertical', distance: 150, duration: 2500 },
         ],
         coins: [
             { x: 550, y: GAME_HEIGHT - 180 },
             { x: 800, y: GAME_HEIGHT - 400 },
-            { x: 450, y: GAME_HEIGHT - 530 },
             { x: 300, y: 350 },
         ],
         powerups: [ { x: 150, y: GAME_HEIGHT - 80, type: 'shield' } ],
         traps: [],
         enemies: [],
-        hazards: []
+        hazards: [
+            { type: 'quicksand', x: 300, y: GAME_HEIGHT - 20, width: 100, height: 40 }
+        ],
+        vines: [
+            { x: 550, y: GAME_HEIGHT - 450 }
+        ],
+        tutorials: [
+            { id: 'moving_platform', text: 'Ride the moving platforms to cross large gaps.', type: 'trigger_zone', x: 350, y: 500, width: 100, height: 200 },
+            { id: 'shield', text: 'The shield protects you from a single hit.', type: 'trigger_zone', x: 150, y: 600, width: 100, height: 100 },
+            { id: 'vine', text: 'Jump towards a vine and press ▲ to swing!\nPress ▲ again to jump off.', type: 'trigger_zone', x: 550, y: 300, width: 150, height: 150 }
+        ]
     },
     { // Level 4: The Elevator (Original 7)
         playerStart: { x: 100, y: GAME_HEIGHT - 100 },
@@ -160,9 +199,15 @@ export const LEVELS = [
              { type: 'snake', x: 650, y: 200, velocityX: ENEMY_SPEED },
              { type: 'bat', x: 450, y: 350 },
         ],
-        hazards: [ { type: 'geyser', x: 400, y: GAME_HEIGHT - 50 } ],
-        vines: [ { x: 800, y: 210 } ],
-        dripSpawners: [ { x: 250, y: 0 } ]
+        hazards: [ 
+            { type: 'geyser', x: 400, y: GAME_HEIGHT - 50 },
+            { type: 'quicksand', x: 550, y: GAME_HEIGHT - 20, width: 150, height: 40 }
+        ],
+        vines: [],
+        dripSpawners: [ { x: 250, y: 0 } ],
+        tutorials: [
+            { id: 'geyser', text: 'Watch out!\nActive geysers will launch you upwards.', type: 'trigger_zone', x: 400, y: 600, width: 100, height: 150 }
+        ]
     },
     { // Level 5: BOSS BATTLE 1 (Original 5)
         playerStart: { x: 100, y: GAME_HEIGHT - 100 },
@@ -181,6 +226,9 @@ export const LEVELS = [
         hazards: [],
         vines: [],
         dripSpawners: [],
+        tutorials: [
+            { id: 'boss', text: 'Stomp on the boss\'s head to deal damage!', type: 'level_start' }
+        ]
     },
     { // Level 6: The Descent (Original 4)
         playerStart: { x: 100, y: 100 },
@@ -209,10 +257,21 @@ export const LEVELS = [
         ],
         enemies: [
             { type: 'snake', x: 400, y: GAME_HEIGHT - 100, velocityX: ENEMY_SPEED },
+            { type: 'turtle', x: 600, y: GAME_HEIGHT - 124 },
         ],
-        hazards: [ { type: 'falling_rock_spawner', x: 870, y: 0, width: 300, height: GAME_HEIGHT } ],
-        vines: [],
+        hazards: [ 
+            { type: 'falling_rock_spawner', x: 870, y: 0, width: 300, height: GAME_HEIGHT },
+            { type: 'quicksand', x: 700, y: GAME_HEIGHT - 20, width: 150, height: 40 }
+        ],
+        vines: [
+            { x: 650, y: 350 },
+            { x: 1025, y: GAME_HEIGHT - 380 }
+        ],
         dripSpawners: [],
+        tutorials: [
+            { id: 'falling_rock', text: 'Danger! Walking here might trigger falling rocks.', type: 'trigger_zone', x: 800, y: 360, width: 150, height: 720 },
+            { id: 'turtle', text: 'Turtles are invulnerable when rolling!\nJump on them when they are walking.', type: 'trigger_zone', x: 550, y: 550, width: 150, height: 150 }
+        ]
     },
     { // Level 7: The Gap (Original 9)
         playerStart: { x: 100, y: GAME_HEIGHT - 100 },
@@ -227,12 +286,14 @@ export const LEVELS = [
         coins: [],
         powerups: [ { x: 100, y: GAME_HEIGHT - 80, type: 'jump' } ],
         traps: [ { x: 600, y: GAME_HEIGHT - 50 } ],
-        enemies: [],
         hazards: [
             { type: 'quicksand', x: 640, y: GAME_HEIGHT - 20, width: 250, height: 40 }
         ],
         vines: [],
         dripSpawners: [],
+        tutorials: [
+            { id: 'quicksand', text: 'Jump quickly to escape the quicksand!', type: 'trigger_zone', x: 500, y: 650, width: 200, height: 100 }
+        ]
     },
     { // Level 8: Risky Ride (Original 8)
         playerStart: { x: 100, y: 100 },
@@ -259,7 +320,10 @@ export const LEVELS = [
              { type: 'snake', x: 950, y: 600, velocityX: -ENEMY_SPEED },
         ],
         hazards: [],
-        vines: [],
+        vines: [
+            { x: 400, y: 180 },
+            { x: 800, y: 320 }
+        ],
         dripSpawners: [],
     },
     { // Level 9: Gauntlet (Original 11)
