@@ -289,7 +289,6 @@ class MainMenuScene extends Phaser.Scene {
     create() {
         this.add.image(0, 0, 'background').setOrigin(0);
         this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 200, 'Ultimate Level Challenge', {
-            // FIX: Changed fontSize from string to number.
             fontSize: 64,
             color: '#f7fafc',
             fontStyle: 'bold',
@@ -307,14 +306,12 @@ class MainMenuScene extends Phaser.Scene {
         const isCompleted = lastCompletion === today;
 
         this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 80, 'Daily Challenge:', {
-            // FIX: Changed fontSize from string to number.
             fontSize: 32,
             color: '#2d3748',
             fontStyle: 'bold'
         }).setOrigin(0.5);
         
         this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 30, todayChallenge.description, {
-            // FIX: Changed fontSize from string to number.
             fontSize: 28,
             color: '#1a202c',
             fontStyle: 'bold'
@@ -322,7 +319,6 @@ class MainMenuScene extends Phaser.Scene {
 
         if (isCompleted) {
              this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 10, '(Completed)', {
-                // FIX: Changed fontSize from string to number.
                 fontSize: 24,
                 color: '#38a169',
                 fontStyle: 'bold'
@@ -330,7 +326,6 @@ class MainMenuScene extends Phaser.Scene {
         }
 
         const startButton = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 100, 'Start Game', {
-            // FIX: Changed fontSize from string to number.
             fontSize: 32,
             color: '#f7fafc',
             fontStyle: 'bold',
@@ -345,7 +340,6 @@ class MainMenuScene extends Phaser.Scene {
         });
         
         const customizeButton = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 170, 'Customize', {
-            // FIX: Changed fontSize from string to number.
             fontSize: 32,
             color: '#f7fafc',
             fontStyle: 'bold',
@@ -384,7 +378,6 @@ class CustomizationScene extends Phaser.Scene {
         this.currentSelection = { ...this.cosmeticsData.equipped };
 
         this.add.text(GAME_WIDTH / 2, 80, 'Customize Your Explorer', {
-            // FIX: Changed fontSize from string to number.
             fontSize: 64,
             color: '#f7fafc',
             fontStyle: 'bold',
@@ -393,7 +386,6 @@ class CustomizationScene extends Phaser.Scene {
         }).setOrigin(0.5);
 
         // Preview Area
-        // FIX: Changed fontSize from string to number.
         this.add.text(320, 180, 'Preview', { fontSize: 48, color: '#2d3748', fontStyle: 'bold' }).setOrigin(0.5);
         const previewBg = this.add.graphics();
         previewBg.fillStyle(0xedf2f7, 0.5);
@@ -411,7 +403,6 @@ class CustomizationScene extends Phaser.Scene {
 
         // Save Button
         const saveButton = this.add.text(GAME_WIDTH - 150, GAME_HEIGHT - 70, 'Save & Exit', {
-            // FIX: Changed fontSize from string to number.
              fontSize: 32, color: '#f7fafc', fontStyle: 'bold', backgroundColor: '#38a169', padding: {x: 15, y: 10}
         }).setOrigin(0.5).setInteractive();
 
@@ -425,7 +416,6 @@ class CustomizationScene extends Phaser.Scene {
         
         // Tooltip for locked items
         this.tooltip = this.add.text(0, 0, '', {
-            // FIX: Changed fontSize from string to number.
             fontSize: 18,
             color: '#f7fafc',
             backgroundColor: 'rgba(45, 55, 72, 0.9)',
@@ -438,7 +428,6 @@ class CustomizationScene extends Phaser.Scene {
     }
     
     createSelectionList(title: string, items: any[], x: number, y: number) {
-        // FIX: Changed fontSize from string to number.
         this.add.text(x, y - 20, title, { fontSize: 32, color: '#2d3748', fontStyle: 'bold' });
 
         const itemsPerRow = 5;
@@ -471,7 +460,6 @@ class CustomizationScene extends Phaser.Scene {
                 const hatIcon = this.add.image(0, 0, item.texture).setScale(2);
                 container.add(hatIcon);
             } else {
-                // FIX: Changed fontSize from string to number.
                  const noHatText = this.add.text(0, 0, 'None', { fontSize: 20, color: '#2d3748' }).setOrigin(0.5);
                  container.add(noHatText);
             }
@@ -539,7 +527,7 @@ class LevelSelectScene extends Phaser.Scene {
     scene!: Phaser.Scenes.ScenePlugin;
     make!: Phaser.GameObjects.GameObjectCreator;
 
-    private dailyChallenge: any;
+    public dailyChallenge: any;
     private isChallengeCompleted = false;
     
     constructor() {
@@ -559,7 +547,6 @@ class LevelSelectScene extends Phaser.Scene {
         this.add.image(0, 0, 'background').setOrigin(0);
 
         this.add.text(GAME_WIDTH / 2, 80, 'Select Level', {
-            // FIX: Changed fontSize from string to number.
             fontSize: 64,
             color: '#f7fafc',
             fontStyle: 'bold',
@@ -574,7 +561,6 @@ class LevelSelectScene extends Phaser.Scene {
         });
 
         this.add.text(GAME_WIDTH - 40, 60, `${totalStars} ★`, {
-            // FIX: Changed fontSize from string to number.
             fontSize: 48, color: '#f6e05e', fontStyle: 'bold', stroke: '#2d3748', strokeThickness: 6
         }).setOrigin(1, 0.5);
         
@@ -607,7 +593,6 @@ class LevelSelectScene extends Phaser.Scene {
             buttonContainer.add(buttonBg);
             
             const levelText = this.add.text(0, -10, `${index + 1}`, {
-                // FIX: Changed fontSize from string to number.
                 fontSize: 50,
                 color: '#f7fafc',
                 fontStyle: 'bold'
@@ -615,7 +600,6 @@ class LevelSelectScene extends Phaser.Scene {
 
             if (isBossLevel) {
                  levelText.setText('B');
-                 // FIX: Changed fontSize from string to number.
                  levelText.setFontSize(60);
             }
             buttonContainer.add(levelText);
@@ -625,7 +609,6 @@ class LevelSelectScene extends Phaser.Scene {
                 buttonContainer.add(lockIcon);
                 levelText.setAlpha(0.3);
 
-                // FIX: Changed fontSize from string to number.
                 const requiredText = this.add.text(0, 35, `${starsRequired} ★`, { fontSize: 24, color: '#f7fafc' }).setOrigin(0.5);
                 buttonContainer.add(requiredText);
             } else {
@@ -672,7 +655,6 @@ class LevelSelectScene extends Phaser.Scene {
 
         // Back button
         const backButton = this.add.text(100, GAME_HEIGHT - 70, '< Back', {
-            // FIX: Changed fontSize from string to number.
             fontSize: 48,
             color: '#f7fafc',
             fontStyle: 'bold',
@@ -1588,7 +1570,7 @@ class GameScene extends Phaser.Scene {
             this.physics.add.overlap(this.player, this.homingProjectiles, this.hitByProjectile, undefined, this);
 
             this.events.emit('bossSpawned', { maxHealth: BOSS_HEALTH, currentHealth: this.bossHealth });
-            this.startBossAttacks();
+            this.startBossCinematic();
         }
 
 
@@ -1633,14 +1615,16 @@ class GameScene extends Phaser.Scene {
     update() {
         this.grabbableVine = null;
         if (Phaser.Input.Keyboard.JustDown(this.escapeKey)) {
-            this.scene.pause();
-            this.scene.pause('UIScene');
-            this.scene.launch('PauseScene', {
-                levelIndex: this.levelIndex,
-                challenge: this.dailyChallenge,
-                isCompleted: this.isChallengeCompleted,
-                score: this.initialScore
-            });
+            if (this.scene.isActive()) {
+                this.scene.pause();
+                this.scene.pause('UIScene');
+                this.scene.launch('PauseScene', {
+                    levelIndex: this.levelIndex,
+                    challenge: this.dailyChallenge,
+                    isCompleted: this.isChallengeCompleted,
+                    score: this.initialScore
+                });
+            }
             return;
         }
 
@@ -2314,7 +2298,7 @@ class GameScene extends Phaser.Scene {
     
     showUnlockMessage(message: string) {
         const unlockText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 150, message, {
-            // FIX: Changed fontSize from string to number.
+            // FIX: The fontSize property must be a number, not a string.
             fontSize: 48,
             color: '#4299e1',
             fontStyle: 'bold',
@@ -2368,7 +2352,7 @@ class GameScene extends Phaser.Scene {
             }
 
             this.challengeCompleteText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 100, 'Challenge Complete!', {
-                // FIX: Changed fontSize from string to number.
+                // FIX: The fontSize property must be a number, not a string.
                 fontSize: 48,
                 color: '#48bb78',
                 fontStyle: 'bold',
@@ -2451,7 +2435,7 @@ class GameScene extends Phaser.Scene {
         localStorage.setItem('ultimateLevelChallenge_shownTutorials', JSON.stringify(Array.from(this.shownTutorials)));
 
         const hintText = this.add.text(GAME_WIDTH / 2, 100, text, {
-            // FIX: Changed fontSize from string to number.
+            // FIX: The fontSize property must be a number, not a string.
             fontSize: 32,
             color: '#f7fafc',
             fontStyle: 'bold',
@@ -2470,6 +2454,103 @@ class GameScene extends Phaser.Scene {
     }
 
     // Boss Methods
+    startBossCinematic() {
+        if (!this.boss) return;
+
+        this.player.active = false;
+        this.physics.pause();
+
+        const bossName = this.add.text(this.boss.x, this.boss.y - 120, 'JUNGLE KING', {
+            // FIX: The fontSize property must be a number, not a string.
+            fontSize: 48,
+            color: '#f7fafc',
+            fontStyle: 'bold',
+            stroke: '#c53030',
+            strokeThickness: 8
+        }).setOrigin(0.5).setAlpha(0).setDepth(100);
+
+        const fightText = this.add.text(this.cameras.main.centerX, this.cameras.main.centerY, 'FIGHT!', {
+            // FIX: The fontSize property must be a number, not a string.
+            fontSize: 96,
+            color: '#f6e05e',
+            fontStyle: 'bold',
+            stroke: '#c53030',
+            strokeThickness: 10
+        }).setOrigin(0.5).setAlpha(0).setScale(0.5).setScrollFactor(0).setDepth(100);
+
+        // FIX: Replaced the tween timeline with a more robust sequence of individual tweens and timers
+        // to prevent "timeline is not a function" errors.
+        
+        // 1. Camera pans to boss
+        this.tweens.add({
+            targets: this.cameras.main,
+            panX: this.boss.x,
+            panY: this.boss.y,
+            zoom: 1.5,
+            duration: 1500,
+            ease: 'Sine.easeInOut',
+        });
+
+        // 2. During pan, boss "roars" and name appears
+        this.time.delayedCall(1000, () => {
+             if (!this.scene.isActive()) return;
+            this.tweens.add({
+                targets: this.boss,
+                scale: 1.1,
+                duration: 200,
+                yoyo: true,
+                ease: 'Power1',
+            });
+            this.tweens.add({
+                targets: bossName,
+                alpha: 1,
+                duration: 500,
+                ease: 'Power1',
+            });
+        });
+        
+        // 3. Name fades out, camera pans back
+        this.time.delayedCall(2500, () => {
+             if (!this.scene.isActive()) return;
+            this.tweens.add({
+                targets: bossName,
+                alpha: 0,
+                duration: 500,
+                ease: 'Power1',
+            });
+            this.tweens.add({
+                targets: this.cameras.main,
+                panX: this.cameras.main.width / 2,
+                panY: this.cameras.main.height / 2,
+                zoom: 1,
+                duration: 1000,
+                ease: 'Sine.easeInOut',
+                delay: 500, // wait for name to fade
+                onComplete: () => {
+                     if (!this.scene.isActive()) return;
+                    // 4. Show "FIGHT!" text
+                    this.tweens.add({
+                        targets: fightText,
+                        alpha: 1,
+                        scale: 1,
+                        duration: 300,
+                        ease: 'Back.easeOut',
+                        yoyo: true,
+                        hold: 500,
+                        onComplete: () => {
+                            // 5. Start the game
+                            if (this.scene.isActive()) {
+                                this.player.active = true;
+                                this.physics.resume();
+                                this.startBossAttacks();
+                            }
+                        }
+                    });
+                }
+            });
+        });
+    }
+
     startBossAttacks() {
         if (!this.boss || !this.boss.active) return;
         this.attackTimer = this.time.addEvent({
@@ -2480,13 +2561,15 @@ class GameScene extends Phaser.Scene {
                 this.boss.setData('isAttacking', true);
     
                 const pattern1Attacks = [this.bossGroundSlam, this.bossThrowProjectiles];
-                const pattern2Attacks = [this.bossGroundSlam, this.bossThrowProjectiles, this.bossThrowHomingProjectiles, this.bossSummonMinions];
+                const pattern2Attacks = [this.bossGroundSlam, this.bossThrowProjectiles, this.bossThrowHomingProjectiles];
                 const enragedAttacks = [this.bossFrenzyAttack, this.bossSummonMinions, this.bossThrowHomingProjectiles];
     
-                // FIX: Explicitly type `availableAttacks` as an array of functions to prevent `selectedAttack` from being inferred as `unknown`.
                 let availableAttacks: ((...args: any[]) => void)[];
                 if (this.bossAttackPattern === 1) {
-                    availableAttacks = pattern1Attacks;
+                    availableAttacks = [...pattern1Attacks];
+                    if (this.bossHealth <= BOSS_HEALTH / 2) {
+                        availableAttacks.push(this.bossSummonMinions);
+                    }
                 } else { // Pattern 2 or higher
                     if (this.bossHealth <= BOSS_HEALTH / 2) {
                         availableAttacks = enragedAttacks;
@@ -2569,7 +2652,6 @@ class GameScene extends Phaser.Scene {
     
     bossSummonMinions() {
         if (!this.boss || !this.boss.active) return;
-        // FIX: Removed the final `force` parameter (0.5) from the flash method, as it expects a boolean.
         this.cameras.main.flash(200, 255, 0, 0);
 
         const positions = [
@@ -2815,7 +2897,7 @@ class LevelCompleteScene extends Phaser.Scene {
         panel.strokeRoundedRect(GAME_WIDTH / 2 - 300, GAME_HEIGHT / 2 - 250, 600, 500, 16);
 
         this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 200, 'Level Complete!', {
-            // FIX: Changed fontSize from string to number.
+            // FIX: The fontSize property must be a number, not a string.
             fontSize: 48, color: '#2d3748', fontStyle: 'bold'
         }).setOrigin(0.5);
 
@@ -2829,7 +2911,6 @@ class LevelCompleteScene extends Phaser.Scene {
         const startY = GAME_HEIGHT / 2 - 60;
         const leftColX = GAME_WIDTH / 2 - 200;
         const rightColX = GAME_WIDTH / 2 + 180;
-        // FIX: Changed fontSize from string to number.
         const textStyle = { fontSize: 28, color: '#2d3748' };
 
         this.add.image(leftColX - 30, startY, 'icon_clock').setScale(1.2);
@@ -2852,7 +2933,6 @@ class LevelCompleteScene extends Phaser.Scene {
         line.fillRect(GAME_WIDTH/2 - 250, startY + 200, 500, 2);
 
         this.add.text(GAME_WIDTH / 2, startY + 240, `Total Score: ${stats.newTotalScore}`, {
-            // FIX: Changed fontSize from string to number.
             fontSize: 36, color: '#2d3748', fontStyle: 'bold'
         }).setOrigin(0.5);
         
@@ -2862,7 +2942,6 @@ class LevelCompleteScene extends Phaser.Scene {
         const buttonText = isLastLevel ? 'Finish' : 'Continue';
         
         const continueButton = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 200, buttonText, {
-            // FIX: Changed fontSize from string to number.
             fontSize: 32, color: '#f7fafc', fontStyle: 'bold', backgroundColor: '#38a169', padding: { x: 20, y: 10 }
         }).setOrigin(0.5).setInteractive();
 
@@ -2909,7 +2988,7 @@ class GameCompleteScene extends Phaser.Scene {
         this.add.image(0, 0, 'background').setOrigin(0);
 
         this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 150, 'Congratulations!', {
-            // FIX: Changed fontSize from string to number.
+            // FIX: The fontSize property must be a number, not a string.
             fontSize: 80,
             color: '#f6e05e', // Gold color
             fontStyle: 'bold',
@@ -2918,7 +2997,6 @@ class GameCompleteScene extends Phaser.Scene {
         }).setOrigin(0.5);
         
         this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 50, 'You have completed the\nUltimate Level Challenge!', {
-            // FIX: Changed fontSize from string to number.
             fontSize: 40,
             color: '#f7fafc',
             fontStyle: 'bold',
@@ -2928,7 +3006,6 @@ class GameCompleteScene extends Phaser.Scene {
         }).setOrigin(0.5);
         
         this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 50, `Final Score: ${this.finalScore}`, {
-            // FIX: Changed fontSize from string to number.
             fontSize: 48,
             color: '#f7fafc',
             fontStyle: 'bold',
@@ -2937,7 +3014,6 @@ class GameCompleteScene extends Phaser.Scene {
         }).setOrigin(0.5);
 
         const menuButton = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 150, 'Return to Main Menu', {
-            // FIX: Changed fontSize from string to number.
             fontSize: 32,
             color: '#f7fafc',
             fontStyle: 'bold',
@@ -2973,14 +3049,12 @@ class GameOverScene extends Phaser.Scene {
     create() {
         this.scene.get('GameScene').sound.stopAll();
         this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 100, 'Game Over', {
-            // FIX: Changed fontSize from string to number.
             fontSize: 64,
             color: '#c53030',
             fontStyle: 'bold'
         }).setOrigin(0.5);
         
         const retryButton = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 50, 'Retry', {
-            // FIX: Changed fontSize from string to number.
             fontSize: 32,
             color: '#f7fafc',
             fontStyle: 'bold',
@@ -3004,7 +3078,6 @@ class GameOverScene extends Phaser.Scene {
         });
 
         const menuButton = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 120, 'Main Menu', {
-            // FIX: Changed fontSize from string to number.
             fontSize: 32,
             color: '#f7fafc',
             fontStyle: 'bold',
@@ -3035,14 +3108,12 @@ class PauseScene extends Phaser.Scene {
         bg.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
 
         this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 100, 'Paused', {
-            // FIX: Changed fontSize from string to number.
             fontSize: 64,
             color: '#f7fafc',
             fontStyle: 'bold'
         }).setOrigin(0.5);
 
         const resumeButton = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 50, 'Resume', {
-            // FIX: Changed fontSize from string to number.
             fontSize: 32, color: '#f7fafc', fontStyle: 'bold', backgroundColor: '#38a169', padding: { x: 20, y: 10 }
         }).setOrigin(0.5).setInteractive();
 
@@ -3055,7 +3126,6 @@ class PauseScene extends Phaser.Scene {
         });
 
         const restartButton = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 120, 'Restart Level', {
-            // FIX: Changed fontSize from string to number.
             fontSize: 32, color: '#f7fafc', fontStyle: 'bold', backgroundColor: '#8b5a2b', padding: { x: 20, y: 10 }
         }).setOrigin(0.5).setInteractive();
 
@@ -3069,7 +3139,6 @@ class PauseScene extends Phaser.Scene {
         });
 
         const menuButton = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 190, 'Main Menu', {
-            // FIX: Changed fontSize from string to number.
             fontSize: 32, color: '#f7fafc', fontStyle: 'bold', backgroundColor: '#4a5568', padding: { x: 20, y: 10 }
         }).setOrigin(0.5).setInteractive();
 
@@ -3114,12 +3183,9 @@ class UIScene extends Phaser.Scene {
     create() {
         const gameScene = this.scene.get('GameScene');
 
-        // FIX: Changed fontSize from string to number.
         this.scoreText = this.add.text(20, 20, 'Score: 0', { fontSize: 32, color: '#f7fafc', fontStyle: 'bold', stroke: '#2d3748', strokeThickness: 6 });
-        // FIX: Changed fontSize from string to number.
         this.powerUpText = this.add.text(GAME_WIDTH - 20, 20, '', { fontSize: 24, color: '#f7fafc', fontStyle: 'bold', align: 'right' }).setOrigin(1, 0);
 
-        // FIX: Changed fontSize from string to number.
         this.challengeText = this.add.text(GAME_WIDTH / 2, 20, this.dailyChallenge.progressText(0), { fontSize: 24, color: '#f7fafc', fontStyle: 'bold' }).setOrigin(0.5, 0);
         if (this.isChallengeCompleted) {
             this.challengeText.setText('Daily Challenge Completed!');
@@ -3170,7 +3236,6 @@ class UIScene extends Phaser.Scene {
             this.bossHealthBar.fillRect(GAME_WIDTH / 2 - 250, GAME_HEIGHT - 60, 500, 30);
             
             // FIX: Using an intermediate variable and .text property assignment to bypass potential typing issue with add.text method.
-            // FIX: Changed fontSize from string to number.
             const bossTitle = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 75, '', { fontSize: 24, color: '#f7fafc', fontStyle: 'bold' }).setOrigin(0.5, 0);
             bossTitle.text = 'JUNGLE KING';
         }, this);
@@ -3224,10 +3289,9 @@ class UIScene extends Phaser.Scene {
         this.dashIcon.fillStyle(0x4299e1, 0.8);
         this.dashIcon.fillRoundedRect(30, abilityY - 25, 50, 50, 8);
         // FIX: Using an intermediate variable and .text property assignment to bypass potential typing issue with add.text method.
-        // FIX: Changed fontSize from string to number.
         const dashLabel = this.add.text(55, abilityY, '', { fontSize: 14, color: '#fff', fontStyle: 'bold'}).setOrigin(0.5);
         dashLabel.text = 'DASH';
-        // FIX: Changed fontSize from string to number.
+        // FIX: The fontSize property must be a number, not a string.
         this.dashCooldownText = this.add.text(55, abilityY, '', { fontSize: 24, color: '#fff', fontStyle: 'bold'}).setOrigin(0.5);
 
         // Parry UI
@@ -3235,10 +3299,8 @@ class UIScene extends Phaser.Scene {
         this.parryIcon.fillStyle(0x68d391, 0.8);
         this.parryIcon.fillRoundedRect(90, abilityY - 25, 50, 50, 8);
         // FIX: Using an intermediate variable and .text property assignment to bypass potential typing issue with add.text method.
-        // FIX: Changed fontSize from string to number.
         const parryLabel = this.add.text(115, abilityY, '', { fontSize: 12, color: '#fff', fontStyle: 'bold'}).setOrigin(0.5);
         parryLabel.text = 'PARRY';
-        // FIX: Changed fontSize from string to number.
         this.parryCooldownText = this.add.text(115, abilityY, '', { fontSize: 24, color: '#fff', fontStyle: 'bold'}).setOrigin(0.5);
 
         gameScene.events.on('dashStatusChanged', (data: { ready: boolean; cooldown: number; }) => {
