@@ -73,6 +73,7 @@ export const CHALLENGES = [
 
 export const LEVELS = [
     { // Level 1: The Basics (Original 1)
+        starsToUnlock: 0,
         playerStart: { x: 100, y: GAME_HEIGHT - 100 },
         goal: { x: GAME_WIDTH - 50, y: GAME_HEIGHT - 184 },
         parTime: 30,
@@ -115,6 +116,7 @@ export const LEVELS = [
         ]
     },
     { // Level 2: Going Up (Original 2)
+        starsToUnlock: 2,
         playerStart: { x: 100, y: GAME_HEIGHT - 100 },
         goal: { x: GAME_WIDTH - 100, y: 100 },
         parTime: 45,
@@ -155,6 +157,7 @@ export const LEVELS = [
         ]
     },
     { // Level 3: First Steps on Air (Original 6)
+        starsToUnlock: 4,
         playerStart: { x: 100, y: GAME_HEIGHT - 100 },
         goal: { x: GAME_WIDTH - 100, y: 100 },
         parTime: 40,
@@ -188,6 +191,7 @@ export const LEVELS = [
         ]
     },
     { // Level 4: The Elevator (Original 7)
+        starsToUnlock: 6,
         playerStart: { x: 100, y: GAME_HEIGHT - 100 },
         goal: { x: GAME_WIDTH - 100, y: 100 },
         parTime: 50,
@@ -224,6 +228,7 @@ export const LEVELS = [
         ]
     },
     { // Level 5: BOSS BATTLE 1 (Original 5)
+        starsToUnlock: 8,
         playerStart: { x: 100, y: GAME_HEIGHT - 100 },
         goal: { x: GAME_WIDTH / 2, y: GAME_HEIGHT - 184 },
         parTime: 90,
@@ -247,6 +252,7 @@ export const LEVELS = [
         ]
     },
     { // Level 6: The Descent (Original 4)
+        starsToUnlock: 11,
         playerStart: { x: 100, y: 100 },
         goal: { x: GAME_WIDTH - 100, y: GAME_HEIGHT - 584 },
         parTime: 60,
@@ -291,6 +297,7 @@ export const LEVELS = [
         ]
     },
     { // Level 7: The Gap (Original 9)
+        starsToUnlock: 14,
         playerStart: { x: 100, y: GAME_HEIGHT - 100 },
         goal: { x: GAME_WIDTH - 100, y: GAME_HEIGHT - 116 },
         parTime: 20,
@@ -314,6 +321,7 @@ export const LEVELS = [
         ]
     },
     { // Level 8: Risky Ride (Original 8)
+        starsToUnlock: 16,
         playerStart: { x: 100, y: 100 },
         goal: { x: GAME_WIDTH - 100, y: GAME_HEIGHT - 116 },
         parTime: 55,
@@ -346,6 +354,7 @@ export const LEVELS = [
         dripSpawners: [],
     },
     { // Level 9: Gauntlet (Original 11)
+        starsToUnlock: 19,
         playerStart: { x: 100, y: GAME_HEIGHT - 100 },
         goal: { x: 1180, y: 100 },
         parTime: 65,
@@ -374,6 +383,7 @@ export const LEVELS = [
         dripSpawners: [],
     },
     { // Level 10: FINAL BOSS (Original 10)
+        starsToUnlock: 22,
         playerStart: { x: 100, y: 100 },
         goal: { x: GAME_WIDTH - 100, y: GAME_HEIGHT - 184 },
         parTime: 120,
