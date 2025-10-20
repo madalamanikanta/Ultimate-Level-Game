@@ -1,6 +1,7 @@
 
+
 import Phaser from 'phaser';
-import { GAME_WIDTH, GAME_HEIGHT, PLAYER_SPEED, PLAYER_JUMP_VELOCITY, GRAVITY, SPEED_BOOST_MODIFIER, SPEED_BOOST_DURATION, JUMP_BOOST_MODIFIER, JUMP_BOOST_DURATION, ENEMY_SPEED, CHALLENGES, DAILY_CHALLENGE_REWARD, LEVELS, DASH_VELOCITY, DASH_DURATION, DASH_COOLDOWN, BOSS_HEALTH, TURTLE_ROLL_SPEED, COSMETICS } from './constants';
+import { GAME_WIDTH, GAME_HEIGHT, PLAYER_SPEED, PLAYER_JUMP_VELOCITY, GRAVITY, SPEED_BOOST_MODIFIER, SPEED_BOOST_DURATION, JUMP_BOOST_MODIFIER, JUMP_BOOST_DURATION, ENEMY_SPEED, CHALLENGES, DAILY_CHALLENGE_REWARD, LEVELS, DASH_VELOCITY, DASH_DURATION, DASH_COOLDOWN, BOSS_HEALTH, TURTLE_ROLL_SPEED, COSMETICS, PARRY_WINDOW, PARRY_COOLDOWN, ENEMY_STUN_DURATION } from './constants';
 
 // Helper functions for managing cosmetic data in localStorage
 const getCosmeticsData = () => {
@@ -100,6 +101,45 @@ class MainMenuScene extends Phaser.Scene {
         crownGraphics.fillCircle(16, 12, 3);
         crownGraphics.generateTexture('hat_crown', 32, 16);
         crownGraphics.destroy();
+
+        // UI Progress Bar Icons
+        const playerMarkerGraphics = this.make.graphics();
+        playerMarkerGraphics.fillStyle(0xffd3a9); // Player head color
+        playerMarkerGraphics.fillCircle(8, 8, 8);
+        playerMarkerGraphics.lineStyle(2, 0x5a3a22);
+        playerMarkerGraphics.strokeCircle(8, 8, 8);
+        playerMarkerGraphics.generateTexture('player_marker_icon', 16, 16);
+        playerMarkerGraphics.destroy();
+
+        const goalMarkerGraphics = this.make.graphics();
+        goalMarkerGraphics.fillStyle(0x6b4a2b); // Pole
+        goalMarkerGraphics.fillRect(4, 0, 4, 16);
+        goalMarkerGraphics.fillStyle(0x9b2c2c); // Red flag
+        goalMarkerGraphics.fillTriangle(8, 0, 8, 8, 16, 4);
+        goalMarkerGraphics.generateTexture('goal_marker_icon', 16, 16);
+        goalMarkerGraphics.destroy();
+
+        // Level Complete Screen Icons
+        const clockIconGraphics = this.make.graphics();
+        clockIconGraphics.fillStyle(0xedf2f7);
+        clockIconGraphics.fillCircle(16, 16, 14);
+        clockIconGraphics.fillStyle(0x2d3748);
+        clockIconGraphics.fillRect(15, 6, 2, 11);
+        clockIconGraphics.fillRect(15, 15, 10, 2);
+        clockIconGraphics.generateTexture('icon_clock', 32, 32);
+        clockIconGraphics.destroy();
+        
+        const skullIconGraphics = this.make.graphics();
+        skullIconGraphics.fillStyle(0xedf2f7);
+        skullIconGraphics.fillEllipse(16, 14, 24, 20);
+        skullIconGraphics.fillStyle(0x2d3748);
+        skullIconGraphics.fillCircle(11, 12, 4);
+        skullIconGraphics.fillCircle(21, 12, 4);
+        skullIconGraphics.fillTriangle(16, 18, 14, 22, 18, 22);
+        skullIconGraphics.fillRect(12, 26, 2, 4);
+        skullIconGraphics.fillRect(18, 26, 2, 4);
+        skullIconGraphics.generateTexture('icon_skull', 32, 32);
+        skullIconGraphics.destroy();
     }
 
     create() {
@@ -409,14 +449,12 @@ class LevelSelectScene extends Phaser.Scene {
                 buttonContainer.on('pointerdown', () => {
                     this.scene.start('GameScene', {
                         challenge: this.dailyChallenge,
-                        // FIX: Correct property name from isCompleted to isChallengeCompleted
                         isCompleted: this.isChallengeCompleted,
                         levelIndex: index,
                         score: 0
                     });
-                    this.scene.start('UIScene', {
+                    this.scene.launch('UIScene', {
                         challenge: this.dailyChallenge,
-                        // FIX: Correct property name from isCompleted to isChallengeCompleted
                         isCompleted: this.isChallengeCompleted,
                         levelIndex: index
                     });
@@ -476,23 +514,35 @@ class GameScene extends Phaser.Scene {
     private facingDirection = 'right';
     private dashCooldownTimer?: Phaser.Time.TimerEvent;
 
+    // Parry Properties
+    private ctrlKey!: Phaser.Input.Keyboard.Key;
+    private canParry = true;
+    private isParrying = false;
+    private parryCooldownTimer?: Phaser.Time.TimerEvent;
+
     // Daily Challenge Properties
-    private dailyChallenge: any;
-    private isChallengeCompleted = false;
+    public dailyChallenge: any;
+    public isChallengeCompleted = false;
     private isCompletedForSession = false;
     private challengeProgress = 0;
     private levelStartTime = 0;
     private challengeCompleteText?: Phaser.GameObjects.Text;
 
-    private levelIndex = 0;
-    private initialScore = 0;
+    public levelIndex = 0;
+    public initialScore = 0;
+    private levelStartX = 0;
+    private levelEndX = 0;
+
+    // Level Stats
+    private levelCoinsCollected = 0;
+    private levelEnemiesDefeated = 0;
 
     // Boss properties
     private boss?: Phaser.Physics.Arcade.Sprite;
     private bossHealth = 0;
     private projectiles!: Phaser.Physics.Arcade.Group;
     private homingProjectiles!: Phaser.Physics.Arcade.Group;
-    private isBossLevel = false;
+    public isBossLevel = false;
     private goal?: Phaser.Physics.Arcade.Sprite;
     private attackTimer?: Phaser.Time.TimerEvent;
     private bossAttackPattern = 1;
@@ -538,6 +588,8 @@ class GameScene extends Phaser.Scene {
         this.isBossLevel = false;
         this.boss = undefined;
         this.isHurt = false;
+        this.levelCoinsCollected = 0;
+        this.levelEnemiesDefeated = 0;
 
         // Load shown tutorials from localStorage
         try {
@@ -801,6 +853,55 @@ class GameScene extends Phaser.Scene {
         explosionParticleGraphics.fillCircle(8, 8, 8);
         explosionParticleGraphics.generateTexture('explosion_particle', 16, 16);
         explosionParticleGraphics.destroy();
+        
+        // Parry/Stun Effects
+        const parryEffectGraphics = this.make.graphics();
+        parryEffectGraphics.lineStyle(4, 0x4299e1);
+        parryEffectGraphics.fillStyle(0x4299e1, 0.3);
+        parryEffectGraphics.beginPath();
+        parryEffectGraphics.moveTo(0, 0);
+        parryEffectGraphics.lineTo(32, 0);
+        parryEffectGraphics.lineTo(32, 32);
+        parryEffectGraphics.lineTo(16, 40);
+        parryEffectGraphics.lineTo(0, 32);
+        parryEffectGraphics.closePath();
+        parryEffectGraphics.fillPath();
+        parryEffectGraphics.strokePath();
+        parryEffectGraphics.generateTexture('parry_effect', 32, 40);
+        parryEffectGraphics.destroy();
+
+        const stunEffectGraphics = this.make.graphics();
+        stunEffectGraphics.fillStyle(0xf6e05e);
+        const drawStar = (x: number, y: number) => {
+            const spikes = 4;
+            const outerRadius = 8;
+            const innerRadius = 4;
+            const points = [];
+            const rot = Math.PI / 2 * 3;
+            const angleStep = Math.PI / spikes;
+
+            for (let i = 0; i < spikes * 2; i++) {
+                const radius = (i % 2 === 0) ? outerRadius : innerRadius;
+                const angle = rot + i * angleStep;
+                points.push({
+                    x: x + radius * Math.cos(angle),
+                    y: y + radius * Math.sin(angle),
+                });
+            }
+
+            stunEffectGraphics.beginPath();
+            stunEffectGraphics.moveTo(points[0].x, points[0].y);
+            for (let i = 1; i < points.length; i++) {
+                stunEffectGraphics.lineTo(points[i].x, points[i].y);
+            }
+            stunEffectGraphics.closePath();
+            stunEffectGraphics.fillPath();
+        };
+        drawStar(8, 16);
+        drawStar(24, 8);
+        drawStar(40, 16);
+        stunEffectGraphics.generateTexture('stun_effect', 48, 24);
+        stunEffectGraphics.destroy();
 
         // Power-ups
         const speedGraphics = this.make.graphics();
@@ -919,12 +1020,14 @@ class GameScene extends Phaser.Scene {
         this.isBossLevel = !!level.boss;
 
         this.platforms = this.physics.add.staticGroup();
-        level.platforms.forEach(p => {
-            const platform = this.platforms.create(p.x, p.y, 'platform');
-            if ((p as any).scaleX || (p as any).scaleY) {
-                platform.setScale((p as any).scaleX || 1, (p as any).scaleY || 1).refreshBody();
-            }
-        });
+        if (level.platforms) {
+            level.platforms.forEach(p => {
+                const platform = this.platforms.create(p.x, p.y, 'platform');
+                if ((p as any).scaleX || (p as any).scaleY) {
+                    platform.setScale((p as any).scaleX || 1, (p as any).scaleY || 1).refreshBody();
+                }
+            });
+        }
 
         this.movingPlatforms = this.physics.add.group({ allowGravity: false, immovable: true });
         if (level.movingPlatforms) {
@@ -1021,20 +1124,26 @@ class GameScene extends Phaser.Scene {
 
 
         this.coins = this.physics.add.group({ allowGravity: false });
-        level.coins.forEach(c => {
-            this.coins.create(c.x, c.y, 'coin');
-        });
+        if (level.coins) {
+            level.coins.forEach(c => {
+                this.coins.create(c.x, c.y, 'coin');
+            });
+        }
 
         this.powerups = this.physics.add.group({ allowGravity: false });
-        level.powerups.forEach(p => {
-            const key = p.type === 'shield' ? 'shield_powerup' : `${p.type}_boost`;
-            this.powerups.create(p.x, p.y, key).setData('type', p.type);
-        });
+        if (level.powerups) {
+            level.powerups.forEach(p => {
+                const key = p.type === 'shield' ? 'shield_powerup' : `${p.type}_boost`;
+                this.powerups.create(p.x, p.y, key).setData('type', p.type);
+            });
+        }
 
         const traps = this.physics.add.staticGroup();
-        level.traps.forEach(t => {
-            traps.create(t.x, t.y, 'trap');
-        });
+        if (level.traps) {
+            level.traps.forEach(t => {
+                traps.create(t.x, t.y, 'trap');
+            });
+        }
         
         // Hazard Setup
         this.fallingRockSpawners = this.physics.add.staticGroup();
@@ -1081,7 +1190,7 @@ class GameScene extends Phaser.Scene {
 
 
         this.enemies = this.physics.add.group();
-        if (!this.isBossLevel) {
+        if (!this.isBossLevel && level.enemies) {
             level.enemies.forEach(e => {
                 if (e.type === 'bat') {
                     const enemy = this.enemies.create(e.x, e.y, 'enemy_bat') as Phaser.Physics.Arcade.Sprite;
@@ -1109,6 +1218,11 @@ class GameScene extends Phaser.Scene {
         if (!this.isBossLevel) {
             this.goal = this.physics.add.staticSprite(level.goal.x, level.goal.y, 'goal');
             this.physics.add.overlap(this.player, this.goal, this.reachGoal, undefined, this);
+            this.levelStartX = level.playerStart.x;
+            this.levelEndX = level.goal.x;
+        } else {
+            this.levelStartX = 0;
+            this.levelEndX = 0;
         }
 
         this.physics.add.collider(this.player, this.platforms);
@@ -1143,6 +1257,7 @@ class GameScene extends Phaser.Scene {
             this.homingProjectiles = this.physics.add.group({ allowGravity: false });
 
             this.physics.add.collider(this.boss, this.platforms);
+            this.physics.add.overlap(this.player, this.boss, this.hitByBossBody, undefined, this);
             this.physics.add.collider(this.player, this.boss, this.hitBoss, (player, boss) => {
                 return (player as Phaser.Physics.Arcade.Sprite).body.velocity.y > 0 && (player as Phaser.Physics.Arcade.Sprite).y < (boss as Phaser.Physics.Arcade.Sprite).y;
             }, this);
@@ -1159,12 +1274,14 @@ class GameScene extends Phaser.Scene {
 
         this.cursors = this.input.keyboard.createCursorKeys();
         this.shiftKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT);
+        this.ctrlKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.CTRL);
         this.escapeKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
 
         this.registry.set('score', this.initialScore);
         this.events.emit('scoreChanged');
         this.events.emit('powerUpChanged', { type: 'None', timeLeft: 0 });
         this.events.emit('dashStatusChanged', { ready: true, cooldown: 0 });
+        this.events.emit('parryStatusChanged', { ready: true, cooldown: 0 });
 
         // Challenge Init
         this.challengeProgress = 0;
@@ -1250,9 +1367,14 @@ class GameScene extends Phaser.Scene {
             this.events.emit('challengeProgressChanged', { progress: this.challengeProgress });
         }
         
+        if (!this.isBossLevel && this.player.active && this.levelEndX > this.levelStartX) {
+            const progress = Phaser.Math.Clamp((this.player.x - this.levelStartX) / (this.levelEndX - this.levelStartX), 0, 1);
+            this.events.emit('progressUpdated', progress);
+        }
+
         this.enemies.getChildren().forEach(c => {
             const enemy = c as Phaser.Physics.Arcade.Sprite;
-            if (!enemy.active) return;
+            if (!enemy.active || enemy.getData('isStunned')) return;
 
             const type = enemy.getData('type');
 
@@ -1353,29 +1475,6 @@ class GameScene extends Phaser.Scene {
             }
         });
 
-        // Vine swaying logic (no longer in use for swinging vines, but can be kept for background vines)
-        /*
-        this.vines.getChildren().forEach(v => {
-            const vine = v as Phaser.GameObjects.Sprite;
-            const distance = Phaser.Math.Distance.Between(this.player.x, this.player.y, vine.x, vine.y);
-            if (distance < 150 && !vine.getData('isSwaying')) {
-                vine.setData('isSwaying', true);
-                this.tweens.add({
-                    targets: vine,
-                    angle: 10,
-                    duration: 1200,
-                    ease: 'Sine.easeInOut',
-                    yoyo: true,
-                    repeat: -1,
-                });
-            } else if (distance >= 150 && vine.getData('isSwaying')) {
-                 vine.setData('isSwaying', false);
-                 this.tweens.killTweensOf(vine);
-                 this.tweens.add({ targets: vine, angle: 0, duration: 600, ease: 'Sine.easeInOut' });
-            }
-        });
-        */
-
         // Quicksand Logic
         let onQuicksand = false;
         let overlappingPit: Phaser.Physics.Arcade.Sprite | null = null;
@@ -1429,14 +1528,24 @@ class GameScene extends Phaser.Scene {
 
         const upJustDown = Phaser.Input.Keyboard.JustDown(this.cursors.up);
         const shiftJustDown = Phaser.Input.Keyboard.JustDown(this.shiftKey);
+        const ctrlJustDown = Phaser.Input.Keyboard.JustDown(this.ctrlKey);
 
         if (shiftJustDown && this.canDash) {
             this.performDash();
         }
 
+        if (ctrlJustDown) {
+            this.performParry();
+        }
+
         if (this.dashCooldownTimer) {
             const remaining = this.dashCooldownTimer.getRemaining();
             this.events.emit('dashStatusChanged', { ready: false, cooldown: remaining });
+        }
+
+        if (this.parryCooldownTimer) {
+            const remaining = this.parryCooldownTimer.getRemaining();
+            this.events.emit('parryStatusChanged', { ready: false, cooldown: remaining });
         }
 
         if (onGround || onQuicksand) {
@@ -1528,11 +1637,83 @@ class GameScene extends Phaser.Scene {
         });
     }
 
+    performParry() {
+        if (!this.canParry) return;
+
+        this.canParry = false;
+        this.isParrying = true;
+
+        const parryEffect = this.add.sprite(this.player.x + (this.player.flipX ? -30 : 30), this.player.y, 'parry_effect').setAlpha(0.8);
+        this.tweens.add({
+            targets: parryEffect,
+            alpha: 0,
+            duration: PARRY_WINDOW + 100,
+            onComplete: () => parryEffect.destroy()
+        });
+        
+        this.time.delayedCall(PARRY_WINDOW, () => {
+            this.isParrying = false;
+        });
+
+        this.parryCooldownTimer = this.time.delayedCall(PARRY_COOLDOWN, () => {
+            this.canParry = true;
+            this.parryCooldownTimer = undefined;
+            this.events.emit('parryStatusChanged', { ready: true, cooldown: 0 });
+        });
+    }
+
+    parrySuccess(target: Phaser.Physics.Arcade.Sprite, isProjectile = false) {
+        if (isProjectile) {
+            target.destroy();
+            if (this.isBossLevel && this.boss && this.boss.active) {
+                this.bossHealth--;
+                this.events.emit('bossHealthChanged', { currentHealth: this.bossHealth });
+                this.boss.setTint(0xff0000);
+                this.time.delayedCall(100, () => this.boss?.clearTint());
+                if (this.bossHealth <= 0) {
+                    this.bossDie();
+                }
+            }
+        } else {
+            // It's an enemy
+            target.setData('isStunned', true);
+            target.setVelocity(0, 0);
+
+            const stunEffect = this.add.sprite(target.x, target.y - target.height / 2, 'stun_effect').setDepth(target.depth + 1);
+            this.tweens.add({
+                targets: stunEffect,
+                y: stunEffect.y - 10,
+                duration: 500,
+                yoyo: true,
+                repeat: -1
+            });
+            
+            this.time.delayedCall(ENEMY_STUN_DURATION, () => {
+                if (target.active) {
+                    target.setData('isStunned', false);
+                    stunEffect.destroy();
+                    // Resume patrol
+                    if (target.getData('type') === 'snake') {
+                        target.setVelocityX(target.flipX ? -ENEMY_SPEED : ENEMY_SPEED);
+                    } else if (target.getData('type') === 'turtle') {
+                        target.setData('isRolling', false);
+                        target.setVelocityX(0);
+                        target.setAngularVelocity(0);
+                        this.tweens.add({ targets: target, scaleY: 1, duration: 100 });
+                    }
+                } else {
+                    stunEffect.destroy();
+                }
+            });
+        }
+    }
+
     collectCoin(player: Phaser.Types.Physics.Arcade.GameObjectWithBody, coin: Phaser.Types.Physics.Arcade.GameObjectWithBody) {
         (coin as Phaser.Physics.Arcade.Sprite).disableBody(true, true);
         const score = this.registry.get('score') + 10;
         this.registry.set('score', score);
         this.events.emit('scoreChanged');
+        this.levelCoinsCollected++;
 
         if (this.dailyChallenge.type === 'coins') {
             this.challengeProgress++;
@@ -1631,6 +1812,18 @@ class GameScene extends Phaser.Scene {
 
         const playerSprite = player as Phaser.Physics.Arcade.Sprite;
         const enemySprite = enemy as Phaser.Physics.Arcade.Sprite;
+
+        if (enemySprite.getData('isStunned')) {
+            enemySprite.destroy();
+            this.levelEnemiesDefeated++;
+            return;
+        }
+
+        if (this.isParrying) {
+            this.parrySuccess(enemySprite);
+            return;
+        }
+
         const enemyType = enemySprite.getData('type');
 
         if (enemyType === 'turtle' && enemySprite.getData('isRolling')) {
@@ -1640,6 +1833,7 @@ class GameScene extends Phaser.Scene {
 
         if (playerSprite.body.velocity.y > 0 && playerSprite.y < enemySprite.y - (enemySprite.height * enemySprite.scaleY) / 2) {
             enemySprite.destroy();
+            this.levelEnemiesDefeated++;
             playerSprite.setVelocityY(-300);
             if (this.dailyChallenge.type === 'enemy') {
                 this.challengeProgress++;
@@ -1675,57 +1869,46 @@ class GameScene extends Phaser.Scene {
     
     reachGoal() {
         if (!this.player.active) return;
-    
+
+        this.physics.pause();
+        this.tweens.killAll();
+        this.time.removeAllEvents();
+        this.player.active = false;
+
         if (this.dailyChallenge.type === 'time') {
             this.checkChallengeCompletion();
         }
     
-        this.physics.pause();
-        this.tweens.killAll();
-        this.time.removeAllEvents();
-    
-        this.player.active = false;
-        this.player.setTint(0x00ff00);
-        this.playerHat?.setTint(0x00ff00);
-    
         this.checkForCosmeticUnlock();
 
-        const nextLevelIndex = this.levelIndex + 1;
-        const isLastLevel = nextLevelIndex >= LEVELS.length;
-    
-        if (!isLastLevel) {
-            const currentUnlocked = parseInt(localStorage.getItem('ultimateLevelChallenge_unlockedLevel') || '0', 10);
-            if (nextLevelIndex > currentUnlocked) {
-                localStorage.setItem('ultimateLevelChallenge_unlockedLevel', nextLevelIndex.toString());
-            }
-        }
-    
-        const message = isLastLevel ? 'You Win!' : 'Level Complete!';
-        const winText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2, message, {
-            fontSize: '64px',
-            color: '#f6e05e',
-            fontStyle: 'bold'
-        }).setOrigin(0.5);
-        winText.setScrollFactor(0);
-    
-        this.time.delayedCall(2000, () => {
-            this.scene.stop('UIScene');
-            if (isLastLevel) {
-                this.scene.start('MainMenuScene');
-            } else {
-                const currentScore = this.registry.get('score');
-                this.scene.start('GameScene', {
-                    challenge: this.dailyChallenge,
-                    isCompleted: this.isCompletedForSession,
-                    levelIndex: nextLevelIndex,
-                    score: currentScore
-                });
-                this.scene.start('UIScene', {
-                    challenge: this.dailyChallenge,
-                    isCompleted: this.isCompletedForSession,
-                    levelIndex: nextLevelIndex
-                });
-            }
+        const timeTaken = (this.time.now - this.levelStartTime) / 1000;
+        const level = LEVELS[this.levelIndex];
+        const parTime = level.parTime || 60;
+
+        const completionBonus = 100;
+        const timeBonus = Math.max(0, Math.floor((parTime - timeTaken) * 5));
+        const enemyBonus = this.levelEnemiesDefeated * 25;
+        // Coin bonus is already added to score registry directly, but we show it in the summary
+        const coinBonus = this.levelCoinsCollected * 10;
+
+        const currentScore = this.registry.get('score');
+        // Add bonuses that aren't coins (which are already added)
+        const newTotalScore = currentScore + timeBonus + enemyBonus + completionBonus;
+        this.registry.set('score', newTotalScore);
+
+        this.scene.stop('UIScene');
+        this.scene.launch('LevelCompleteScene', {
+            levelIndex: this.levelIndex,
+            timeTaken: timeTaken,
+            coinsCollected: this.levelCoinsCollected,
+            enemiesDefeated: this.levelEnemiesDefeated,
+            timeBonus: timeBonus,
+            coinBonus: coinBonus,
+            enemyBonus: enemyBonus,
+            completionBonus: completionBonus,
+            newTotalScore: newTotalScore,
+            challenge: this.dailyChallenge,
+            isCompletedForSession: this.isCompletedForSession
         });
     }
 
@@ -1869,14 +2052,11 @@ class GameScene extends Phaser.Scene {
 
     // Tutorial Methods
     showTutorialHint(player: Phaser.Types.Physics.Arcade.GameObjectWithBody, trigger: Phaser.Types.Physics.Arcade.GameObjectWithBody) {
-        const triggerZone = trigger as Phaser.Physics.Arcade.Sprite;
-        const text = triggerZone.getData('text');
-        const id = triggerZone.getData('id');
-
-        if (text && id && !this.shownTutorials.has(id)) {
-            this.displayHint(text, id);
-            triggerZone.destroy();
-        }
+        const triggerSprite = trigger as Phaser.Physics.Arcade.Sprite;
+        const text = triggerSprite.getData('text');
+        const id = triggerSprite.getData('id');
+        triggerSprite.destroy();
+        this.displayHint(text, id);
     }
 
     displayHint(text: string, id: string) {
@@ -1885,249 +2065,109 @@ class GameScene extends Phaser.Scene {
         this.shownTutorials.add(id);
         localStorage.setItem('ultimateLevelChallenge_shownTutorials', JSON.stringify(Array.from(this.shownTutorials)));
 
-        const hintContainer = this.add.container(GAME_WIDTH / 2, 100).setAlpha(0);
-
-        const textObject = this.add.text(0, 0, text, {
-            fontSize: '28px',
+        const hintText = this.add.text(GAME_WIDTH / 2, 100, text, {
+            fontSize: '32px',
             color: '#f7fafc',
             fontStyle: 'bold',
             align: 'center',
-            wordWrap: { width: 450, useAdvancedWrap: true }
-        }).setOrigin(0.5);
+            backgroundColor: 'rgba(45, 55, 72, 0.8)',
+            padding: { x: 20, y: 10 },
+            wordWrap: { width: 600 }
+        }).setOrigin(0.5).setDepth(100);
+        hintText.setScrollFactor(0);
 
-        const textBounds = textObject.getBounds();
-        const bgPadding = 20;
-
-        const bg = this.add.graphics();
-        bg.fillStyle(0x2d3748, 0.8);
-        bg.fillRoundedRect(
-            -textBounds.width / 2 - bgPadding,
-            -textBounds.height / 2 - bgPadding,
-            textBounds.width + bgPadding * 2,
-            textBounds.height + bgPadding * 2,
-            16
-        );
-        bg.lineStyle(2, 0x4a5568);
-        bg.strokeRoundedRect(
-            -textBounds.width / 2 - bgPadding,
-            -textBounds.height / 2 - bgPadding,
-            textBounds.width + bgPadding * 2,
-            textBounds.height + bgPadding * 2,
-            16
-        );
-
-        hintContainer.add(bg);
-        hintContainer.add(textObject);
-        hintContainer.setDepth(100);
-
-        this.tweens.chain({
-            targets: hintContainer,
-            tweens: [
-                {
-                    alpha: 1,
-                    y: 120,
-                    duration: 500,
-                    ease: 'Power2'
-                },
-                {
-                    delay: 4000,
-                    alpha: 1,
-                    duration: 1
-                },
-                {
-                    alpha: 0,
-                    y: 100,
-                    duration: 500,
-                    ease: 'Power2',
-                    onComplete: () => {
-                        hintContainer.destroy();
-                    }
-                }
-            ]
+        this.time.delayedCall(5000, () => {
+            if (hintText && hintText.active) {
+                hintText.destroy();
+            }
         });
     }
 
     // Boss Methods
     startBossAttacks() {
+        if (!this.boss || !this.boss.active) return;
         this.attackTimer = this.time.addEvent({
-            delay: 2000,
-            callback: this.bossAttack,
+            delay: 3000,
+            callback: () => {
+                if (!this.boss || !this.boss.active || this.boss.getData('isAttacking')) return;
+                
+                this.boss.setData('isAttacking', true);
+
+                const attackType = Phaser.Math.Between(1, this.bossAttackPattern === 1 ? 2 : 3);
+                
+                // Fix: Correctly create particle emitter. `this.add.particles()` should be called without arguments.
+                // The texture key is passed in the emitter config via the `frame` property.
+                // The `blendMode` is changed from a string to the corresponding `Phaser.BlendModes` enum value.
+                const tellVFX = this.add.particles().createEmitter({
+                    frame: 'sparkle',
+                    x: this.boss.x,
+                    y: this.boss.y - 64,
+                    speed: { min: -100, max: 100 },
+                    angle: { min: 0, max: 360 },
+                    scale: { start: 1, end: 0 },
+                    blendMode: Phaser.BlendModes.ADD,
+                    lifespan: 500
+                });
+                
+                this.time.delayedCall(500, () => {
+                    tellVFX.stop();
+
+                    switch(attackType) {
+                        case 1: this.bossGroundSlam(); break;
+                        case 2: this.bossThrowProjectiles(); break;
+                        case 3: this.bossThrowHomingProjectiles(); break;
+                    }
+
+                    this.time.delayedCall(1500, () => {
+                         if (this.boss) this.boss.setData('isAttacking', false);
+                    });
+                });
+            },
             callbackScope: this,
             loop: true
         });
     }
 
-    bossAttack() {
-        if (!this.boss || !this.boss.active) {
-            this.attackTimer?.remove();
-            return;
-        }
-
-        if (this.boss.getData('isAttacking')) {
-            return;
-        }
-
-        const phase = this.bossHealth > BOSS_HEALTH / 2 ? 1 : 2;
-
-        switch (this.bossAttackPattern) {
-            case 1:
-                if (phase === 1) {
-                    if (Phaser.Math.Between(1, 10) <= 7) {
-                        this.bossThrowProjectile();
-                    } else {
-                        this.bossCharge();
-                    }
-                } else {
-                    if (Phaser.Math.Between(1, 10) <= 5) {
-                        this.bossThrowProjectile();
-                        this.time.delayedCall(200, this.bossThrowProjectile, [], this);
-                    } else {
-                        this.bossCharge();
-                    }
-                }
-                break;
-            case 2:
-                const attackType = Phaser.Math.Between(1, 3);
-                if (attackType === 1) {
-                    this.bossThrowSpreadProjectile(phase === 1 ? 3 : 5);
-                } else if (attackType === 2) {
-                    this.bossThrowHomingProjectile();
-                } else {
-                    this.bossCharge();
-                }
-                break;
-        }
-    }
-
-    bossThrowProjectile() {
-        if (!this.boss || !this.boss.active || !this.player.active) return;
+    bossGroundSlam() {
+        if (!this.boss || !this.boss.active) return;
         
-        this.boss.setData('isAttacking', true);
-        this.boss.setTint(0xf6e05e);
-    
-        this.time.delayedCall(400, () => {
-            if (!this.boss || !this.boss.active) {
-                this.boss?.setData('isAttacking', false);
-                return;
-            }
-    
-            this.boss.clearTint();
-            const projectile = this.projectiles.create(this.boss.x, this.boss.y, 'projectile');
-            projectile.body.onWorldBounds = true;
-            this.physics.moveToObject(projectile, this.player, 400);
-            
-            this.boss.setData('isAttacking', false);
-        });
-    }
-
-    bossThrowSpreadProjectile(count: number) {
-        if (!this.boss || !this.boss.active || !this.player.active) return;
-        
-        this.boss.setData('isAttacking', true);
-        this.boss.setTint(0xed8936);
+        const originalY = this.boss.y;
         this.tweens.add({
             targets: this.boss,
-            scale: 1.1,
-            duration: 300,
+            y: originalY - 100,
+            duration: 200,
+            ease: 'Power2',
             yoyo: true,
-            ease: 'Power1'
-        });
-    
-        this.time.delayedCall(600, () => {
-            if (!this.boss || !this.boss.active) {
-                this.boss?.setData('isAttacking', false);
-                return;
+            onYoyo: () => {
+                if (!this.boss || !this.boss.active) return;
+                this.cameras.main.shake(300, 0.01);
+                // Create shockwave effect or spawn hazards from the ground
+                for (let i = 0; i < 3; i++) {
+                    const rock = this.fallingRocks.create(Phaser.Math.Between(100, GAME_WIDTH - 100), -50, 'falling_rock');
+                    rock.setVelocityY(Phaser.Math.Between(300, 500));
+                }
             }
+        });
+    }
     
-            this.boss.clearTint();
-            const centerAngle = Phaser.Math.Angle.Between(this.boss.x, this.boss.y, this.player.x, this.player.y);
-            const spreadAngle = Phaser.Math.DegToRad(15);
-            const startAngle = centerAngle - (spreadAngle * (count - 1)) / 2;
-    
-            for (let i = 0; i < count; i++) {
-                const angle = startAngle + i * spreadAngle;
+    bossThrowProjectiles() {
+        if (!this.boss || !this.boss.active || !this.player.active) return;
+        
+        for (let i = 0; i < 3; i++) {
+            this.time.delayedCall(i * 200, () => {
+                if (!this.boss || !this.boss.active || !this.player.active) return;
                 const projectile = this.projectiles.create(this.boss.x, this.boss.y, 'projectile');
-                projectile.setScale(0.8);
-                this.physics.velocityFromRotation(angle, 450, projectile.body.velocity);
-            }
-    
-            this.boss.setData('isAttacking', false);
-        });
+                const angle = Phaser.Math.Angle.Between(this.boss.x, this.boss.y, this.player.x, this.player.y + Phaser.Math.Between(-50, 50));
+                this.physics.velocityFromRotation(angle, 400, projectile.body.velocity);
+            });
+        }
     }
 
-    bossThrowHomingProjectile() {
-        if (!this.boss || !this.boss.active) return;
+    bossThrowHomingProjectiles() {
+        if (!this.boss || !this.boss.active || !this.player.active) return;
         
-        this.boss.setData('isAttacking', true);
-        this.boss.setTint(0x9f7aea);
-    
-        const sparkle = this.add.sprite(this.boss.x, this.boss.y - 60, 'sparkle').setAlpha(0);
-    
-        this.tweens.add({
-            targets: sparkle,
-            alpha: 1,
-            scale: 2,
-            angle: 180,
-            duration: 400,
-            yoyo: true,
-            repeat: 0
-        });
-    
-        this.time.delayedCall(800, () => {
-            sparkle.destroy();
-            if (!this.boss || !this.boss.active) {
-                this.boss?.setData('isAttacking', false);
-                return;
-            }
-    
-            this.boss.clearTint();
-            const projectile = this.homingProjectiles.create(this.boss.x, this.boss.y, 'projectile_homing');
-            this.physics.moveToObject(projectile, this.player, 300);
-            
-            this.time.delayedCall(5000, () => {
-                if (projectile.active) {
-                    projectile.destroy();
-                }
-            });
-    
-            this.boss.setData('isAttacking', false);
-        });
-    }
-    
-    bossCharge() {
-        if (!this.boss || !this.boss.active) return;
-    
-        this.boss.setData('isAttacking', true);
-        this.boss.setTint(0xff6666);
-        this.tweens.add({
-            targets: this.boss,
-            scaleX: 1.1,
-            scaleY: 0.9,
-            duration: 250,
-            yoyo: true,
-            ease: 'Power1',
-        });
-    
-        this.time.delayedCall(500, () => {
-            if (!this.boss || !this.boss.active) {
-                this.boss?.setData('isAttacking', false);
-                return;
-            }
-    
-            this.boss.clearTint();
-            const chargeSpeed = 800;
-            const targetX = this.player.x;
-            this.boss.setVelocityX(targetX < this.boss.x ? -chargeSpeed : chargeSpeed);
-            
-            this.time.delayedCall(800, () => {
-                if (this.boss && this.boss.active) {
-                    this.boss.setVelocityX(0);
-                }
-                this.time.delayedCall(200, () => {
-                    this.boss?.setData('isAttacking', false);
-                });
-            });
-        });
+        const projectile = this.homingProjectiles.create(this.boss.x, this.boss.y, 'projectile_homing');
+        projectile.setVelocity(this.boss.flipX ? -200 : 200, -200);
     }
 
     hitBoss(player: Phaser.Types.Physics.Arcade.GameObjectWithBody, boss: Phaser.Types.Physics.Arcade.GameObjectWithBody) {
@@ -2135,465 +2175,585 @@ class GameScene extends Phaser.Scene {
 
         const playerSprite = player as Phaser.Physics.Arcade.Sprite;
         playerSprite.setVelocityY(-400);
-
         this.bossHealth--;
         this.events.emit('bossHealthChanged', { currentHealth: this.bossHealth });
 
         this.boss?.setTint(0xff0000);
-        this.time.delayedCall(100, () => {
-            this.boss?.clearTint();
-        });
+        this.time.delayedCall(100, () => this.boss?.clearTint());
 
         if (this.bossHealth <= 0) {
             this.bossDie();
-        } else if (this.bossHealth === BOSS_HEALTH / 2) {
-            this.boss?.setTint(0xffff00);
-            this.time.delayedCall(500, () => this.boss?.clearTint());
-            this.attackTimer?.remove();
-            this.attackTimer = this.time.addEvent({
-                delay: 1200,
-                callback: this.bossAttack,
-                callbackScope: this,
-                loop: true
-            });
         }
     }
     
-    hitByProjectile(player: Phaser.Types.Physics.Arcade.GameObjectWithBody, projectile: Phaser.Types.Physics.Arcade.GameObjectWithBody) {
-        (projectile as Phaser.Physics.Arcade.Sprite).destroy();
+    hitByBossBody(player: Phaser.Types.Physics.Arcade.GameObjectWithBody, boss: Phaser.Types.Physics.Arcade.GameObjectWithBody) {
+        if (this.isInvincible) return;
         this.takeDamage();
     }
 
-    bossDie() {
-        if (!this.boss) return;
-        this.attackTimer?.remove();
-    
-        this.cameras.main.shake(500, 0.01); 
-    
-        this.boss.disableBody(true, false);
-        this.events.emit('bossDefeated');
-    
-        this.boss.setVisible(false);
-    
-        const particles = this.add.particles(0, 0, 'explosion_particle', {
-            x: this.boss.x,
-            y: this.boss.y,
-            speed: { min: 150, max: 500 },
-            angle: { min: 0, max: 360 },
-            scale: { start: 1.2, end: 0 },
-            blendMode: 'ADD',
-            lifespan: 1000,
-            gravityY: 300
-        });
-        particles.explode(100);
-    
-        this.time.delayedCall(1200, () => {
-            this.boss?.destroy();
-            particles.destroy();
-        });
-    
-        this.time.delayedCall(600, () => {
-            const victoryText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2, 'VICTORY!', {
-                fontSize: '128px',
-                color: '#f6e05e',
-                fontStyle: 'bold',
-                stroke: '#6b4a2b',
-                strokeThickness: 10
-            }).setOrigin(0.5).setScale(0);
-    
-            this.tweens.add({
-                targets: victoryText,
-                scale: 1,
-                duration: 800,
-                ease: 'Elastic.easeOut',
-                onComplete: () => {
-                    this.time.delayedCall(1500, () => victoryText.destroy());
-                }
-            });
-    
-            const showerDuration = 2200;
-            this.time.addEvent({
-                delay: 30,
-                repeat: showerDuration / 30,
-                callback: () => {
-                    if (!this.scene.isActive()) return;
-                    const x = Phaser.Math.Between(0, GAME_WIDTH);
-                    const banana = this.physics.add.sprite(x, -50, 'coin');
-                    banana.setVelocity(Phaser.Math.Between(-50, 50), Phaser.Math.Between(400, 700));
-                    (banana.body as Phaser.Physics.Arcade.Body).setAllowGravity(false);
-                    banana.setAngle(Phaser.Math.Between(-30, 30));
-                    banana.setAngularVelocity(Phaser.Math.Between(-180, 180));
-                    this.time.delayedCall(3000, () => {
-                        if (banana.active) banana.destroy();
-                    });
-                }
-            });
-        });
-    
-        const level = LEVELS[this.levelIndex];
-        this.time.delayedCall(3500, () => {
-            if (!this.scene.isActive()) return;
-            this.goal = this.physics.add.staticSprite(level.goal.x, level.goal.y, 'goal');
-            this.physics.add.overlap(this.player, this.goal, this.reachGoal, undefined, this);
-        });
+    hitByProjectile(player: Phaser.Types.Physics.Arcade.GameObjectWithBody, projectile: Phaser.Types.Physics.Arcade.GameObjectWithBody) {
+        if (this.isParrying) {
+            this.parrySuccess(projectile as Phaser.Physics.Arcade.Sprite, true);
+        } else {
+             (projectile as Phaser.Physics.Arcade.Sprite).destroy();
+            this.takeDamage();
+        }
     }
 
+    bossDie() {
+        if (this.attackTimer) this.attackTimer.remove();
+        this.boss?.destroy();
+        this.projectiles.clear(true, true);
+        this.homingProjectiles.clear(true, true);
+
+        // Fix: Correctly create particle emitter. `this.add.particles()` should be called without arguments.
+        // The texture key is passed in the emitter config via the `frame` property.
+        // The `blendMode` is changed from a string to the corresponding `Phaser.BlendModes` enum value.
+        const emitter = this.add.particles().createEmitter({
+            frame: 'explosion_particle',
+            x: this.boss?.x || GAME_WIDTH / 2,
+            y: this.boss?.y || GAME_HEIGHT / 2,
+            speed: { min: -400, max: 400 },
+            angle: { min: 0, max: 360 },
+            scale: { start: 1, end: 0 },
+            blendMode: Phaser.BlendModes.ADD,
+            lifespan: 800,
+            quantity: 50
+        });
+
+        this.time.delayedCall(500, () => emitter.stop());
+
+        this.goal = this.physics.add.staticSprite(LEVELS[this.levelIndex].goal.x, LEVELS[this.levelIndex].goal.y, 'goal');
+        this.physics.add.overlap(this.player, this.goal, this.reachGoal, undefined, this);
+    }
+    
     // Vine Swinging Methods
     handleVineOverlap(player: Phaser.Types.Physics.Arcade.GameObjectWithBody, vine: Phaser.Types.Physics.Arcade.GameObjectWithBody) {
+        if (this.isSwinging || (player as Phaser.Physics.Arcade.Sprite).body.velocity.y < 0) return;
         this.grabbableVine = vine as Phaser.Physics.Arcade.Sprite;
     }
-
+    
     startSwinging(vine: Phaser.Physics.Arcade.Sprite) {
+        if (this.grabCooldown) return;
+
         this.isSwinging = true;
         this.attachedVine = vine;
-
         (this.player.body as Phaser.Physics.Arcade.Body).setAllowGravity(false);
-        
+        this.player.setVelocity(0, 0);
+
         this.swingAnchor = { x: vine.x, y: vine.y };
-        
         const dx = this.player.x - this.swingAnchor.x;
         const dy = this.player.y - this.swingAnchor.y;
         this.swingRadius = Math.sqrt(dx * dx + dy * dy);
         this.swingAngle = Math.atan2(dy, dx);
-        
-        const playerVel = this.player.body.velocity;
-        this.swingAngularVelocity = (playerVel.x * dy - playerVel.y * dx) / (this.swingRadius * this.swingRadius);
-
-        this.player.setVelocity(0, 0);
-
-        this.grabCooldown = true;
-        this.time.delayedCall(250, () => { this.grabCooldown = false; });
+        this.swingAngularVelocity = 0.01;
     }
 
     handleSwinging() {
-        if (!this.swingAnchor || !this.attachedVine || !this.player.active) {
-            this.stopSwinging(true); // Force stop if something is wrong
-            return;
-        }
-
-        if (Phaser.Input.Keyboard.JustDown(this.cursors.up) && !this.grabCooldown) {
-            this.stopSwinging();
-            return;
-        }
-
-        // Input to influence swing
-        if (this.cursors.left.isDown) {
-            this.swingAngularVelocity -= 0.0008;
-        } else if (this.cursors.right.isDown) {
-            this.swingAngularVelocity += 0.0008;
-        }
-
-        // Pendulum physics (gravity)
-        const swingForce = (GRAVITY / 1000000) * Math.cos(this.swingAngle);
-        this.swingAngularVelocity -= swingForce;
-        this.swingAngularVelocity *= 0.995; // Damping
-        this.swingAngle += this.swingAngularVelocity;
-
-        this.player.x = this.swingAnchor.x + Math.cos(this.swingAngle) * this.swingRadius;
-        this.player.y = this.swingAnchor.y + Math.sin(this.swingAngle) * this.swingRadius;
+        if (!this.isSwinging || !this.swingAnchor) return;
         
-        this.player.setFlipX(this.swingAngularVelocity > 0);
-        this.player.setRotation(this.swingAngle - Math.PI / 2);
-        this.player.anims.play('climb', true);
+        // Apply gravity-like force to the swing
+        this.swingAngularVelocity += Math.cos(this.swingAngle) * 0.001;
+        
+        // Dampen the swing
+        this.swingAngularVelocity *= 0.99;
+        
+        this.swingAngle += this.swingAngularVelocity;
+        
+        this.player.x = this.swingAnchor.x + this.swingRadius * Math.cos(this.swingAngle);
+        this.player.y = this.swingAnchor.y + this.swingRadius * Math.sin(this.swingAngle);
+        
+        const angleDegrees = Phaser.Math.RadToDeg(this.swingAngle) + 90;
+        this.player.setAngle(angleDegrees);
+        this.player.setFlipX(this.swingAngularVelocity < 0);
+        
+        if (Phaser.Input.Keyboard.JustDown(this.cursors.up)) {
+            this.stopSwinging();
+        }
     }
-
-    stopSwinging(force = false) {
-        if (!this.isSwinging) return;
+    
+    stopSwinging(isDamage = false) {
+        if (!this.isSwinging || !this.swingAnchor) return;
 
         this.isSwinging = false;
         this.attachedVine = null;
-
-        (this.player.body as Phaser.Physics.Arcade.Body).setAllowGravity(true);
-        this.player.setRotation(0);
+        this.grabCooldown = true;
+        this.time.delayedCall(500, () => { this.grabCooldown = false; });
         
-        if (!force) {
-            const tangentialSpeed = this.swingAngularVelocity * this.swingRadius;
-            const releaseMultiplier = 60;
-            const releaseVx = tangentialSpeed * -Math.sin(this.swingAngle) * releaseMultiplier;
-            const releaseVy = tangentialSpeed * Math.cos(this.swingAngle) * releaseMultiplier;
-
-            this.player.setVelocity(releaseVx, releaseVy);
-            
-            this.canDoubleJump = true;
+        (this.player.body as Phaser.Physics.Arcade.Body).setAllowGravity(true);
+        this.player.setAngle(0);
+        
+        if (!isDamage) {
+            const releaseVelocityX = -this.swingAngularVelocity * this.swingRadius * Math.sin(this.swingAngle) * 60;
+            const releaseVelocityY = this.swingAngularVelocity * this.swingRadius * Math.cos(this.swingAngle) * 60;
+            this.player.setVelocity(releaseVelocityX, releaseVelocityY - 300);
         }
+
+        this.swingAnchor = null;
+    }
+
+}
+
+class LevelCompleteScene extends Phaser.Scene {
+    constructor() {
+        super({ key: 'LevelCompleteScene' });
+    }
+
+    init(data: {
+        levelIndex: number;
+        timeTaken: number;
+        coinsCollected: number;
+        enemiesDefeated: number;
+        timeBonus: number;
+        coinBonus: number;
+        enemyBonus: number;
+        completionBonus: number;
+        newTotalScore: number;
+        challenge: any;
+        isCompletedForSession: boolean;
+    }) {
+        this.data.set('stats', data);
+    }
+    
+    create() {
+        const stats = this.data.get('stats');
+
+        const bg = this.add.graphics();
+        bg.fillStyle(0x000000, 0.7);
+        bg.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+
+        const panel = this.add.graphics();
+        panel.fillStyle(0xedf2f7, 0.9);
+        panel.fillRoundedRect(GAME_WIDTH / 2 - 300, GAME_HEIGHT / 2 - 250, 600, 500, 16);
+        panel.lineStyle(4, 0x2d3748);
+        panel.strokeRoundedRect(GAME_WIDTH / 2 - 300, GAME_HEIGHT / 2 - 250, 600, 500, 16);
+
+        this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 200, 'Level Complete!', {
+            fontSize: '48px', color: '#2d3748', fontStyle: 'bold'
+        }).setOrigin(0.5);
+
+        const startY = GAME_HEIGHT / 2 - 120;
+        const leftColX = GAME_WIDTH / 2 - 200;
+        const rightColX = GAME_WIDTH / 2 + 180;
+        const textStyle = { fontSize: '28px', color: '#2d3748' };
+
+        this.add.image(leftColX - 30, startY, 'icon_clock').setScale(1.2);
+        this.add.text(leftColX, startY, `Time: ${stats.timeTaken.toFixed(2)}s`, textStyle).setOrigin(0, 0.5);
+        this.add.text(rightColX, startY, `+${stats.timeBonus}`, textStyle).setOrigin(1, 0.5);
+
+        this.add.image(leftColX - 30, startY + 50, 'coin').setScale(1.2);
+        this.add.text(leftColX, startY + 50, `Bananas: ${stats.coinsCollected}`, textStyle).setOrigin(0, 0.5);
+        this.add.text(rightColX, startY + 50, `+${stats.coinBonus}`, textStyle).setOrigin(1, 0.5);
+
+        this.add.image(leftColX - 30, startY + 100, 'icon_skull').setScale(1.2);
+        this.add.text(leftColX, startY + 100, `Enemies: ${stats.enemiesDefeated}`, textStyle).setOrigin(0, 0.5);
+        this.add.text(rightColX, startY + 100, `+${stats.enemyBonus}`, textStyle).setOrigin(1, 0.5);
+
+        this.add.text(leftColX, startY + 150, `Completion Bonus`, textStyle).setOrigin(0, 0.5);
+        this.add.text(rightColX, startY + 150, `+${stats.completionBonus}`, textStyle).setOrigin(1, 0.5);
+
+        const line = this.add.graphics();
+        line.fillStyle(0x4a5568);
+        line.fillRect(GAME_WIDTH/2 - 250, startY + 200, 500, 2);
+
+        this.add.text(GAME_WIDTH / 2, startY + 240, `Total Score: ${stats.newTotalScore}`, {
+            fontSize: '36px', color: '#2d3748', fontStyle: 'bold'
+        }).setOrigin(0.5);
+        
+        const unlockedLevel = parseInt(localStorage.getItem('ultimateLevelChallenge_unlockedLevel') || '0', 10);
+        if (stats.levelIndex >= unlockedLevel) {
+            localStorage.setItem('ultimateLevelChallenge_unlockedLevel', (stats.levelIndex + 1).toString());
+        }
+
+        const nextLevelIndex = stats.levelIndex + 1;
+        const isLastLevel = nextLevelIndex >= LEVELS.length;
+
+        const buttonText = isLastLevel ? 'Finish' : 'Continue';
+        
+        const continueButton = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 200, buttonText, {
+            fontSize: '32px', color: '#f7fafc', fontStyle: 'bold', backgroundColor: '#38a169', padding: { x: 20, y: 10 }
+        }).setOrigin(0.5).setInteractive();
+
+        continueButton.on('pointerover', () => continueButton.setBackgroundColor('#2f855a'));
+        continueButton.on('pointerout', () => continueButton.setBackgroundColor('#38a169'));
+        continueButton.on('pointerdown', () => {
+            if (isLastLevel) {
+                this.scene.start('GameCompleteScene', { finalScore: stats.newTotalScore });
+            } else {
+                this.scene.start('GameScene', {
+                    challenge: stats.challenge,
+                    isCompleted: stats.isCompletedForSession,
+                    levelIndex: nextLevelIndex,
+                    score: stats.newTotalScore
+                });
+                this.scene.launch('UIScene', {
+                    challenge: stats.challenge,
+                    isCompleted: stats.isCompletedForSession,
+                    levelIndex: nextLevelIndex
+                });
+            }
+        });
     }
 }
 
-class UIScene extends Phaser.Scene {
-    add!: Phaser.GameObjects.GameObjectFactory;
-    scene!: Phaser.Scenes.ScenePlugin;
-    
-    private scoreText!: Phaser.GameObjects.Text;
-    private powerUpText!: Phaser.GameObjects.Text;
-    private challengeText!: Phaser.GameObjects.Text;
-    private levelText!: Phaser.GameObjects.Text;
-    private dashText!: Phaser.GameObjects.Text;
-    private dailyChallenge: any;
-    private isChallengeCompleted = false;
-    private levelIndex = 0;
-
-    // Boss UI
-    private bossHealthBar?: Phaser.GameObjects.Graphics;
-    private bossHealthBarBg?: Phaser.GameObjects.Graphics;
-    private bossNameText?: Phaser.GameObjects.Text;
+class GameCompleteScene extends Phaser.Scene {
+    private finalScore = 0;
+    make!: Phaser.GameObjects.GameObjectCreator;
 
     constructor() {
-        super({ key: 'UIScene' });
+        super({ key: 'GameCompleteScene' });
     }
 
-    init(data: { challenge: any; isCompleted: boolean; levelIndex: number }) {
-        this.dailyChallenge = data.challenge;
-        this.isChallengeCompleted = data.isCompleted;
-        this.levelIndex = data.levelIndex;
+    init(data: { finalScore: number }) {
+        this.finalScore = data.finalScore || 0;
+    }
+    
+    preload() {
+        // Confetti particle
+        const particleGraphics = this.make.graphics();
+        particleGraphics.fillStyle(0xffffff);
+        particleGraphics.fillRect(0, 0, 8, 8);
+        particleGraphics.generateTexture('confetti', 8, 8);
+        particleGraphics.destroy();
     }
 
     create() {
-        this.scoreText = this.add.text(16, 16, 'Bananas: 0', {
+        this.add.image(0, 0, 'background').setOrigin(0);
+
+        this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 150, 'Congratulations!', {
+            fontSize: '80px',
+            color: '#f6e05e', // Gold color
+            fontStyle: 'bold',
+            stroke: '#2d3748',
+            strokeThickness: 10
+        }).setOrigin(0.5);
+        
+        this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 50, 'You have completed the\nUltimate Level Challenge!', {
+            fontSize: '40px',
+            color: '#f7fafc',
+            fontStyle: 'bold',
+            align: 'center',
+            stroke: '#2d3748',
+            strokeThickness: 6
+        }).setOrigin(0.5);
+        
+        this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 50, `Final Score: ${this.finalScore}`, {
+            fontSize: '48px',
+            color: '#f7fafc',
+            fontStyle: 'bold',
+            stroke: '#2d3748',
+            strokeThickness: 6
+        }).setOrigin(0.5);
+
+        const menuButton = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 150, 'Return to Main Menu', {
             fontSize: '32px',
-            color: '#f6e05e',
-            fontStyle: 'bold',
-            stroke: '#6b4a2b',
-            strokeThickness: 5
-        });
-
-        this.powerUpText = this.add.text(16, 50, 'Power-up: None', {
-            fontSize: '24px',
             color: '#f7fafc',
             fontStyle: 'bold',
-            stroke: '#2d3748',
-            strokeThickness: 4
-        });
+            backgroundColor: '#38a169',
+            padding: { x: 20, y: 10 }
+        }).setOrigin(0.5).setInteractive();
 
-        this.levelText = this.add.text(GAME_WIDTH - 16, 16, `Level: ${this.levelIndex + 1}`, {
-            fontSize: '32px',
-            color: '#f7fafc',
-            fontStyle: 'bold',
-            stroke: '#2d3748',
-            strokeThickness: 5
-        }).setOrigin(1, 0);
-
-        this.challengeText = this.add.text(16, 80, '', {
-             fontSize: '24px',
-            color: '#f7fafc',
-            fontStyle: 'bold',
-            stroke: '#2d3748',
-            strokeThickness: 4
-        });
-
-        this.dashText = this.add.text(16, 110, 'Dash: Ready', {
-            fontSize: '24px',
-            color: '#4299e1',
-            fontStyle: 'bold',
-            stroke: '#2d3748',
-            strokeThickness: 4
+        menuButton.on('pointerover', () => menuButton.setBackgroundColor('#2f855a'));
+        menuButton.on('pointerout', () => menuButton.setBackgroundColor('#38a169'));
+        menuButton.on('pointerdown', () => {
+            this.scene.start('MainMenuScene');
         });
         
-        const gameScene = this.scene.get('GameScene');
-        gameScene.events.on('scoreChanged', () => {
-            this.scoreText.setText('Bananas: ' + gameScene.registry.get('score') / 10);
+        // Fix: Correctly create particle emitter. `this.add.particles()` should be called without arguments.
+        // The texture key is passed in the emitter config via the `frame` property.
+        // The `blendMode` is changed from a string to the corresponding `Phaser.BlendModes` enum value.
+        this.add.particles().createEmitter({
+            frame: 'confetti',
+            x: { min: 0, max: GAME_WIDTH },
+            y: -10,
+            lifespan: 5000,
+            speedY: { min: 100, max: 300 },
+            speedX: { min: -50, max: 50 },
+            scale: { start: 1, end: 0.5 },
+            quantity: 2,
+            blendMode: Phaser.BlendModes.NORMAL,
+            tint: [0xff0000, 0x00ff00, 0x0000ff, 0xffff00, 0xff00ff, 0x00ffff]
         });
-
-        gameScene.events.on('powerUpChanged', (data: { type: string, timeLeft: number }) => {
-            if (data.timeLeft > 0) {
-                const typeName = data.type.charAt(0).toUpperCase() + data.type.slice(1);
-                this.powerUpText.setText(`Power-up: ${typeName} (${data.timeLeft}s)`);
-            } else if (data.type === 'shield') {
-                this.powerUpText.setText('Power-up: Shield');
-            }
-            else {
-                this.powerUpText.setText('Power-up: None');
-            }
-        });
-
-        gameScene.events.on('dashStatusChanged', (data: { ready: boolean, cooldown: number }) => {
-            if (data.ready) {
-                this.dashText.setText('Dash: Ready');
-                this.dashText.setColor('#4299e1');
-            } else {
-                const cooldownSeconds = (data.cooldown / 1000).toFixed(1);
-                this.dashText.setText(`Dash: ${cooldownSeconds}s`);
-                this.dashText.setColor('#a0aec0');
-            }
-        });
-
-        // Challenge UI
-        if (this.isChallengeCompleted) {
-            this.challengeText.setText('Challenge: Completed');
-            this.challengeText.setColor('#48bb78');
-        } else {
-             this.challengeText.setText(`Challenge: ${this.dailyChallenge.progressText(0)}`);
-        }
-       
-        gameScene.events.on('challengeProgressChanged', (data: { progress: number }) => {
-            if (!this.isChallengeCompleted) {
-                this.challengeText.setText(`Challenge: ${this.dailyChallenge.progressText(data.progress)}`);
-            }
-        });
-
-        gameScene.events.on('challengeCompleted', () => {
-            this.isChallengeCompleted = true;
-            this.challengeText.setText('Challenge: Completed');
-            this.challengeText.setColor('#48bb78');
-        });
-
-        // Boss UI Listeners
-        gameScene.events.on('bossSpawned', this.createBossUI, this);
-        gameScene.events.on('bossHealthChanged', this.updateBossHealth, this);
-        gameScene.events.on('bossDefeated', this.destroyBossUI, this);
     }
-    
-    createBossUI(data: { maxHealth: number, currentHealth: number }) {
-        const barWidth = 400;
-        const barHeight = 25;
-        const x = GAME_WIDTH / 2 - barWidth / 2;
-        const y = 50;
+}
 
-        this.bossHealthBarBg = this.add.graphics();
-        this.bossHealthBarBg.fillStyle(0x2d3748, 0.8);
-        this.bossHealthBarBg.fillRoundedRect(x, y, barWidth, barHeight, 8);
+class GameOverScene extends Phaser.Scene {
+    constructor() {
+        super({ key: 'GameOverScene' });
+    }
 
-        this.bossHealthBar = this.add.graphics();
-        this.updateBossHealth({ currentHealth: data.currentHealth });
-
-        this.bossNameText = this.add.text(GAME_WIDTH / 2, y - 5, 'Jungle Gorilla', {
-            fontSize: '28px',
+    create() {
+        this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 100, 'Game Over', {
+            fontSize: '64px',
+            color: '#c53030',
+            fontStyle: 'bold'
+        }).setOrigin(0.5);
+        
+        const retryButton = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 50, 'Retry', {
+            fontSize: '32px',
             color: '#f7fafc',
             fontStyle: 'bold',
-            stroke: '#2d3748',
-            strokeThickness: 5
-        }).setOrigin(0.5);
-    }
+            backgroundColor: '#8b5a2b',
+            padding: { x: 20, y: 10 }
+        }).setOrigin(0.5).setInteractive();
+        
+        retryButton.on('pointerover', () => retryButton.setBackgroundColor('#6b4a2b'));
+        retryButton.on('pointerout', () => retryButton.setBackgroundColor('#8b5a2b'));
+        retryButton.on('pointerdown', () => {
+            const gameScene = this.scene.get('GameScene') as GameScene;
+            const data = {
+                levelIndex: gameScene.levelIndex,
+                score: gameScene.initialScore,
+                challenge: gameScene.dailyChallenge,
+                isCompleted: gameScene.isChallengeCompleted
+            };
+            this.scene.start('GameScene', data);
+            this.scene.launch('UIScene', data);
+        });
 
-    updateBossHealth(data: { currentHealth: number }) {
-        if (!this.bossHealthBar) return;
+        const menuButton = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 120, 'Main Menu', {
+            fontSize: '32px',
+            color: '#f7fafc',
+            fontStyle: 'bold',
+            backgroundColor: '#4a5568',
+            padding: { x: 20, y: 10 }
+        }).setOrigin(0.5).setInteractive();
 
-        const percentage = Math.max(0, data.currentHealth / BOSS_HEALTH);
-        const barWidth = 400;
-        const barHeight = 25;
-        const x = GAME_WIDTH / 2 - barWidth / 2;
-        const y = 50;
-
-        this.bossHealthBar.clear();
-        this.bossHealthBar.fillStyle(percentage > 0.5 ? 0x48bb78 : (percentage > 0.2 ? 0xf6e05e : 0xc53030));
-        this.bossHealthBar.fillRoundedRect(x, y, barWidth * percentage, barHeight, 8);
-    }
-
-    destroyBossUI() {
-        this.bossHealthBar?.destroy();
-        this.bossHealthBarBg?.destroy();
-        this.bossNameText?.destroy();
-        this.bossHealthBar = undefined;
-        this.bossHealthBarBg = undefined;
-        this.bossNameText = undefined;
+        menuButton.on('pointerover', () => menuButton.setBackgroundColor('#2d3748'));
+        menuButton.on('pointerout', () => menuButton.setBackgroundColor('#4a5568'));
+        menuButton.on('pointerdown', () => this.scene.start('MainMenuScene'));
     }
 }
 
 class PauseScene extends Phaser.Scene {
-    add!: Phaser.GameObjects.GameObjectFactory;
-    input!: Phaser.Input.InputPlugin;
-    scene!: Phaser.Scenes.ScenePlugin;
-
-    private restartData: any;
+    private previousSceneData: any;
 
     constructor() {
         super({ key: 'PauseScene' });
     }
 
     init(data: any) {
-        this.restartData = data;
+        this.previousSceneData = data;
     }
 
     create() {
-        // Semi-transparent background
-        this.add.rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.7).setOrigin(0);
+        const bg = this.add.graphics();
+        bg.fillStyle(0x000000, 0.7);
+        bg.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
 
-        this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 150, 'Paused', {
+        this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 100, 'Paused', {
             fontSize: '64px',
             color: '#f7fafc',
-            fontStyle: 'bold',
-            stroke: '#2d3748',
-            strokeThickness: 8
-        }).setOrigin(0.5);
-
-        const buttonStyle = {
-            fontSize: '40px',
-            color: '#f7fafc',
-            fontStyle: 'bold',
-            backgroundColor: '#4a5568',
-            padding: { x: 20, y: 10 },
-        };
-
-        const resumeButton = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 30, 'Resume', buttonStyle).setOrigin(0.5).setInteractive();
-        const restartButton = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 50, 'Restart Level', buttonStyle).setOrigin(0.5).setInteractive();
-        const mainMenuButton = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 130, 'Main Menu', buttonStyle).setOrigin(0.5).setInteractive();
-
-        resumeButton.on('pointerover', () => resumeButton.setBackgroundColor('#2d3748'));
-        resumeButton.on('pointerout', () => resumeButton.setBackgroundColor('#4a5568'));
-        resumeButton.on('pointerdown', () => this.resumeGame());
-
-        restartButton.on('pointerover', () => restartButton.setBackgroundColor('#2d3748'));
-        restartButton.on('pointerout', () => restartButton.setBackgroundColor('#4a5568'));
-        restartButton.on('pointerdown', () => {
-            this.scene.stop('GameScene');
-            this.scene.stop('UIScene');
-            this.scene.start('GameScene', this.restartData);
-            this.scene.start('UIScene', this.restartData);
-        });
-
-        mainMenuButton.on('pointerover', () => mainMenuButton.setBackgroundColor('#2d3748'));
-        mainMenuButton.on('pointerout', () => mainMenuButton.setBackgroundColor('#4a5568'));
-        mainMenuButton.on('pointerdown', () => {
-            this.scene.stop('GameScene');
-            this.scene.stop('UIScene');
-            this.scene.start('MainMenuScene');
-        });
-
-        // Also allow resuming with the Escape key
-        this.input.keyboard.once('keydown-ESC', this.resumeGame, this);
-    }
-
-    resumeGame() {
-        this.scene.resume('GameScene');
-        this.scene.resume('UIScene');
-        this.scene.stop();
-    }
-}
-
-class GameOverScene extends Phaser.Scene {
-    add!: Phaser.GameObjects.GameObjectFactory;
-    input!: Phaser.Input.InputPlugin;
-    scene!: Phaser.Scenes.ScenePlugin;
-
-    constructor() {
-        super({ key: 'GameOverScene' });
-    }
-
-    create() {
-        this.add.rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.7).setOrigin(0);
-        
-        this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 50, 'Game Over', {
-            fontSize: '64px',
-            color: '#c53030',
             fontStyle: 'bold'
         }).setOrigin(0.5);
 
-        this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 50, 'Click to Restart', {
-            fontSize: '32px',
-            color: '#a0aec0'
-        }).setOrigin(0.5);
+        const resumeButton = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 50, 'Resume', {
+            fontSize: '32px', color: '#f7fafc', fontStyle: 'bold', backgroundColor: '#38a169', padding: { x: 20, y: 10 }
+        }).setOrigin(0.5).setInteractive();
 
-        this.input.once('pointerdown', () => {
+        resumeButton.on('pointerover', () => resumeButton.setBackgroundColor('#2f855a'));
+        resumeButton.on('pointerout', () => resumeButton.setBackgroundColor('#38a169'));
+        resumeButton.on('pointerdown', () => {
+            this.scene.resume('GameScene');
+            this.scene.resume('UIScene');
+            this.scene.stop();
+        });
+
+        const restartButton = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 120, 'Restart Level', {
+            fontSize: '32px', color: '#f7fafc', fontStyle: 'bold', backgroundColor: '#8b5a2b', padding: { x: 20, y: 10 }
+        }).setOrigin(0.5).setInteractive();
+
+        restartButton.on('pointerover', () => restartButton.setBackgroundColor('#6b4a2b'));
+        restartButton.on('pointerout', () => restartButton.setBackgroundColor('#8b5a2b'));
+        restartButton.on('pointerdown', () => {
+            this.scene.stop('GameScene');
+            this.scene.stop('UIScene');
+            this.scene.start('GameScene', this.previousSceneData);
+            this.scene.launch('UIScene', this.previousSceneData);
+        });
+
+        const menuButton = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 190, 'Main Menu', {
+            fontSize: '32px', color: '#f7fafc', fontStyle: 'bold', backgroundColor: '#4a5568', padding: { x: 20, y: 10 }
+        }).setOrigin(0.5).setInteractive();
+
+        menuButton.on('pointerover', () => menuButton.setBackgroundColor('#2d3748'));
+        menuButton.on('pointerout', () => menuButton.setBackgroundColor('#4a5568'));
+        menuButton.on('pointerdown', () => {
+            this.scene.stop('GameScene');
+            this.scene.stop('UIScene');
             this.scene.start('MainMenuScene');
         });
     }
 }
 
+class UIScene extends Phaser.Scene {
+    private scoreText!: Phaser.GameObjects.Text;
+    private powerUpText!: Phaser.GameObjects.Text;
+    private challengeText!: Phaser.GameObjects.Text;
+    private bossHealthBar?: Phaser.GameObjects.Graphics;
+    private bossHealthBarBg?: Phaser.GameObjects.Graphics;
+    private progressBarBg?: Phaser.GameObjects.Graphics;
+    private progressBar?: Phaser.GameObjects.Graphics;
+    private playerMarker?: Phaser.GameObjects.Image;
+    private dashIcon?: Phaser.GameObjects.Graphics;
+    private dashCooldownText?: Phaser.GameObjects.Text;
+    private parryIcon?: Phaser.GameObjects.Graphics;
+    private parryCooldownText?: Phaser.GameObjects.Text;
+    
+    private dailyChallenge: any;
+    private isChallengeCompleted = false;
+    private levelIndex = 0;
+
+    constructor() {
+        super({ key: 'UIScene' });
+    }
+    
+    init(data: { challenge: any; isCompleted: boolean; levelIndex: number; }) {
+        this.dailyChallenge = data.challenge;
+        this.isChallengeCompleted = data.isCompleted;
+        this.levelIndex = data.levelIndex;
+    }
+
+    create() {
+        const gameScene = this.scene.get('GameScene');
+
+        this.scoreText = this.add.text(20, 20, 'Score: 0', { fontSize: '32px', color: '#f7fafc', fontStyle: 'bold', stroke: '#2d3748', strokeThickness: 6 });
+        this.powerUpText = this.add.text(GAME_WIDTH - 20, 20, '', { fontSize: '24px', color: '#f7fafc', fontStyle: 'bold', align: 'right' }).setOrigin(1, 0);
+
+        this.challengeText = this.add.text(GAME_WIDTH / 2, 20, this.dailyChallenge.progressText(0), { fontSize: '24px', color: '#f7fafc', fontStyle: 'bold' }).setOrigin(0.5, 0);
+        if (this.isChallengeCompleted) {
+            this.challengeText.setText('Daily Challenge Completed!');
+            this.challengeText.setColor('#48bb78');
+        }
+
+        gameScene.events.on('scoreChanged', () => {
+            this.scoreText.setText(`Score: ${gameScene.registry.get('score')}`);
+        }, this);
+        
+        gameScene.events.on('powerUpChanged', (data: { type: string; timeLeft: number }) => {
+            if (data.type === 'None' || data.timeLeft <= 0) {
+                this.powerUpText.setText('');
+            } else if (data.type === 'shield') {
+                this.powerUpText.setText('Shield Active');
+                this.powerUpText.setColor('#68d391');
+            } else {
+                this.powerUpText.setText(`${data.type.toUpperCase()} Boost: ${data.timeLeft}s`);
+                 this.powerUpText.setColor(data.type === 'speed' ? '#4299e1' : '#68d391');
+            }
+        }, this);
+        
+        gameScene.events.on('challengeProgressChanged', (data: { progress: number; }) => {
+            if (!this.isChallengeCompleted) {
+                this.challengeText.setText(this.dailyChallenge.progressText(data.progress));
+            }
+        }, this);
+        
+        gameScene.events.on('challengeCompleted', () => {
+            this.isChallengeCompleted = true;
+            this.challengeText.setText('Challenge Complete!');
+            this.challengeText.setColor('#48bb78');
+        }, this);
+
+        gameScene.events.on('bossSpawned', (data: { maxHealth: number; currentHealth: number; }) => {
+            this.bossHealthBarBg = this.add.graphics();
+            this.bossHealthBarBg.fillStyle(0x2d3748, 0.8);
+            this.bossHealthBarBg.fillRect(GAME_WIDTH / 2 - 250, GAME_HEIGHT - 60, 500, 30);
+            
+            this.bossHealthBar = this.add.graphics();
+            this.bossHealthBar.fillStyle(0xc53030);
+            this.bossHealthBar.fillRect(GAME_WIDTH / 2 - 250, GAME_HEIGHT - 60, 500, 30);
+            
+            this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 75, 'JUNGLE KING', { fontSize: '24px', color: '#f7fafc', fontStyle: 'bold' }).setOrigin(0.5, 0);
+        }, this);
+        
+        gameScene.events.on('bossHealthChanged', (data: { currentHealth: number }) => {
+            if (this.bossHealthBar) {
+                const width = 500 * (data.currentHealth / BOSS_HEALTH);
+                this.bossHealthBar.clear();
+                this.bossHealthBar.fillStyle(0xc53030);
+                this.bossHealthBar.fillRect(GAME_WIDTH / 2 - 250, GAME_HEIGHT - 60, width, 30);
+            }
+        }, this);
+        
+        if (!(gameScene as GameScene).isBossLevel) {
+            const barWidth = 400;
+            const barX = GAME_WIDTH / 2 - barWidth / 2;
+            const barY = GAME_HEIGHT - 40;
+
+            this.progressBarBg = this.add.graphics();
+            this.progressBarBg.fillStyle(0x2d3748, 0.7);
+            this.progressBarBg.fillRoundedRect(barX, barY, barWidth, 12, 6);
+
+            this.progressBar = this.add.graphics();
+            this.progressBar.fillStyle(0xf6e05e);
+            this.progressBar.fillRoundedRect(barX, barY, 0, 12, 6);
+            
+            this.add.image(barX - 25, barY + 6, 'player_marker_icon').setOrigin(0.5);
+            this.add.image(barX + barWidth + 25, barY + 6, 'goal_marker_icon').setOrigin(0.5);
+
+            this.playerMarker = this.add.image(barX, barY + 6, 'player_marker_icon').setOrigin(0.5);
+
+            gameScene.events.on('progressUpdated', (progress: number) => {
+                const newWidth = barWidth * progress;
+                if (this.progressBar) {
+                    this.progressBar.clear();
+                    this.progressBar.fillStyle(0xf6e05e);
+                    this.progressBar.fillRoundedRect(barX, barY, newWidth, 12, 6);
+                }
+                if (this.playerMarker) {
+                    this.playerMarker.x = barX + newWidth;
+                }
+            }, this);
+        }
+
+        // Ability Cooldowns UI
+        const abilityY = GAME_HEIGHT - 50;
+        
+        // Dash UI
+        this.dashIcon = this.add.graphics();
+        this.dashIcon.fillStyle(0x4299e1, 0.8);
+        this.dashIcon.fillRoundedRect(30, abilityY - 25, 50, 50, 8);
+        this.add.text(55, abilityY, 'DASH', { fontSize: '14px', color: '#fff', fontStyle: 'bold'}).setOrigin(0.5);
+        this.dashCooldownText = this.add.text(55, abilityY, '', { fontSize: '24px', color: '#fff', fontStyle: 'bold'}).setOrigin(0.5);
+
+        // Parry UI
+        this.parryIcon = this.add.graphics();
+        this.parryIcon.fillStyle(0x68d391, 0.8);
+        this.parryIcon.fillRoundedRect(90, abilityY - 25, 50, 50, 8);
+        this.add.text(115, abilityY, 'PARRY', { fontSize: '12px', color: '#fff', fontStyle: 'bold'}).setOrigin(0.5);
+        this.parryCooldownText = this.add.text(115, abilityY, '', { fontSize: '24px', color: '#fff', fontStyle: 'bold'}).setOrigin(0.5);
+
+        gameScene.events.on('dashStatusChanged', (data: { ready: boolean; cooldown: number; }) => {
+            if (data.ready) {
+                this.dashIcon?.setAlpha(1);
+                this.dashCooldownText?.setText('');
+            } else {
+                this.dashIcon?.setAlpha(0.4);
+                this.dashCooldownText?.setText(`${(data.cooldown / 1000).toFixed(1)}`);
+            }
+        }, this);
+
+        gameScene.events.on('parryStatusChanged', (data: { ready: boolean; cooldown: number; }) => {
+             if (data.ready) {
+                this.parryIcon?.setAlpha(1);
+                this.parryCooldownText?.setText('');
+            } else {
+                this.parryIcon?.setAlpha(0.4);
+                this.parryCooldownText?.setText(`${(data.cooldown / 1000).toFixed(1)}`);
+            }
+        }, this);
+    }
+}
 
 const config: Phaser.Types.Core.GameConfig = {
     type: Phaser.AUTO,
     width: GAME_WIDTH,
     height: GAME_HEIGHT,
     parent: 'game-container',
+    scale: {
+        mode: Phaser.Scale.FIT,
+        autoCenter: Phaser.Scale.CENTER_BOTH
+    },
     physics: {
         default: 'arcade',
         arcade: {
@@ -2601,11 +2761,7 @@ const config: Phaser.Types.Core.GameConfig = {
             debug: false
         }
     },
-    scale: {
-        mode: Phaser.Scale.FIT,
-        autoCenter: Phaser.Scale.CENTER_BOTH
-    },
-    scene: [MainMenuScene, CustomizationScene, LevelSelectScene, GameScene, UIScene, PauseScene, GameOverScene]
+    scene: [MainMenuScene, CustomizationScene, LevelSelectScene, GameScene, UIScene, LevelCompleteScene, GameCompleteScene, GameOverScene, PauseScene]
 };
 
-new Phaser.Game(config);
+const game = new Phaser.Game(config);

@@ -12,6 +12,11 @@ export const DASH_VELOCITY = 1000;
 export const DASH_DURATION = 150; // ms
 export const DASH_COOLDOWN = 1500; // ms
 
+// Parry Constants
+export const PARRY_WINDOW = 150; // ms
+export const PARRY_COOLDOWN = 1000; // ms
+export const ENEMY_STUN_DURATION = 2000; // ms
+
 // Power-up Constants
 export const SPEED_BOOST_MODIFIER = 1.5;
 export const SPEED_BOOST_DURATION = 5000; // in ms
@@ -70,6 +75,7 @@ export const LEVELS = [
     { // Level 1: The Basics (Original 1)
         playerStart: { x: 100, y: GAME_HEIGHT - 100 },
         goal: { x: GAME_WIDTH - 50, y: GAME_HEIGHT - 184 },
+        parTime: 30,
         platforms: [
             { x: 150, y: GAME_HEIGHT - 50 },
             { x: 450, y: GAME_HEIGHT - 150, scaleX: 0.7 },
@@ -86,7 +92,9 @@ export const LEVELS = [
             { x: 500, y: GAME_HEIGHT - 410 },
             { x: 900, y: GAME_HEIGHT - 530 }
         ],
-        powerups: [],
+        powerups: [
+            { type: 'speed', x: 800, y: GAME_HEIGHT - 280 }
+        ],
         traps: [
             { x: 1100, y: GAME_HEIGHT - 50 },
         ],
@@ -102,12 +110,14 @@ export const LEVELS = [
             { id: 'move', text: 'Use ◀️ and ▶️ Arrow Keys to Move', type: 'level_start' },
             { id: 'jump', text: 'Press ▲ to Jump\nPress again in mid-air to Double Jump!', type: 'trigger_zone', x: 300, y: 650, width: 200, height: 100 },
             { id: 'dash', text: 'Press SHIFT to Dash!\nYou are invincible while dashing.', type: 'trigger_zone', x: 600, y: 550, width: 200, height: 100 },
+            { id: 'parry', text: 'Press CTRL to Parry incoming attacks!\nTime it right to stun enemies.', type: 'trigger_zone', x: 700, y: 400, width: 150, height: 150 },
             { id: 'enemy', text: 'Stomp on enemies from above to defeat them!', type: 'trigger_zone', x: 750, y: 400, width: 150, height: 150 }
         ]
     },
     { // Level 2: Going Up (Original 2)
         playerStart: { x: 100, y: GAME_HEIGHT - 100 },
         goal: { x: GAME_WIDTH - 100, y: 100 },
+        parTime: 45,
         platforms: [
             { x: 150, y: GAME_HEIGHT - 50 },
             { x: 400, y: GAME_HEIGHT - 180 },
@@ -147,6 +157,7 @@ export const LEVELS = [
     { // Level 3: First Steps on Air (Original 6)
         playerStart: { x: 100, y: GAME_HEIGHT - 100 },
         goal: { x: GAME_WIDTH - 100, y: 100 },
+        parTime: 40,
         platforms: [
             { x: 150, y: GAME_HEIGHT - 50 },
             { x: GAME_WIDTH - 150, y: 164 },
@@ -179,6 +190,7 @@ export const LEVELS = [
     { // Level 4: The Elevator (Original 7)
         playerStart: { x: 100, y: GAME_HEIGHT - 100 },
         goal: { x: GAME_WIDTH - 100, y: 100 },
+        parTime: 50,
         platforms: [
             { x: 150, y: GAME_HEIGHT - 50 },
             { x: 400, y: GAME_HEIGHT - 50 },
@@ -193,7 +205,9 @@ export const LEVELS = [
             { x: 250, y: GAME_HEIGHT - 500 },
             { x: 800, y: 170 },
         ],
-        powerups: [],
+        powerups: [
+            { type: 'shield', x: 100, y: GAME_HEIGHT - 130 }
+        ],
         traps: [ { x: 350, y: GAME_HEIGHT - 50 } ],
         enemies: [
              { type: 'snake', x: 650, y: 200, velocityX: ENEMY_SPEED },
@@ -212,6 +226,7 @@ export const LEVELS = [
     { // Level 5: BOSS BATTLE 1 (Original 5)
         playerStart: { x: 100, y: GAME_HEIGHT - 100 },
         goal: { x: GAME_WIDTH / 2, y: GAME_HEIGHT - 184 },
+        parTime: 90,
         platforms: [
             { x: GAME_WIDTH / 2, y: GAME_HEIGHT - 50, scaleX: 10 },
             { x: 200, y: GAME_HEIGHT - 250 },
@@ -227,12 +242,14 @@ export const LEVELS = [
         vines: [],
         dripSpawners: [],
         tutorials: [
-            { id: 'boss', text: 'Stomp on the boss\'s head to deal damage!', type: 'level_start' }
+            { id: 'boss', text: 'Stomp on the boss\'s head to deal damage!', type: 'level_start' },
+            { id: 'parry_boss', text: 'You can parry projectiles back at the boss!', type: 'trigger_zone', x: 400, y: 400, width: 400, height: 400 }
         ]
     },
     { // Level 6: The Descent (Original 4)
         playerStart: { x: 100, y: 100 },
         goal: { x: GAME_WIDTH - 100, y: GAME_HEIGHT - 584 },
+        parTime: 60,
         platforms: [
             { x: 150, y: 164, scaleX: 0.8 },
             { x: 400, y: 300 },
@@ -276,6 +293,7 @@ export const LEVELS = [
     { // Level 7: The Gap (Original 9)
         playerStart: { x: 100, y: GAME_HEIGHT - 100 },
         goal: { x: GAME_WIDTH - 100, y: GAME_HEIGHT - 116 },
+        parTime: 20,
         platforms: [
             { x: 200, y: GAME_HEIGHT - 50, scaleX: 2 },
             { x: GAME_WIDTH - 200, y: GAME_HEIGHT - 50, scaleX: 2 },
@@ -298,6 +316,7 @@ export const LEVELS = [
     { // Level 8: Risky Ride (Original 8)
         playerStart: { x: 100, y: 100 },
         goal: { x: GAME_WIDTH - 100, y: GAME_HEIGHT - 116 },
+        parTime: 55,
         platforms: [
             { x: 150, y: 164 },
         ],
@@ -329,6 +348,7 @@ export const LEVELS = [
     { // Level 9: Gauntlet (Original 11)
         playerStart: { x: 100, y: GAME_HEIGHT - 100 },
         goal: { x: 1180, y: 100 },
+        parTime: 65,
         platforms: [
             { x: 150, y: GAME_HEIGHT - 50 },
         ],
@@ -338,7 +358,9 @@ export const LEVELS = [
             { x: 500, y: 250, moveType: 'horizontal', distance: 400, duration: 4000 },
         ],
         coins: [],
-        powerups: [],
+        powerups: [
+            { type: 'speed', x: 100, y: GAME_HEIGHT - 130 }
+        ],
         traps: [
              { x: 400, y: 600 },
              { x: 700, y: 284 }
@@ -354,6 +376,7 @@ export const LEVELS = [
     { // Level 10: FINAL BOSS (Original 10)
         playerStart: { x: 100, y: 100 },
         goal: { x: GAME_WIDTH - 100, y: GAME_HEIGHT - 184 },
+        parTime: 120,
         platforms: [
             { x: GAME_WIDTH / 2, y: GAME_HEIGHT - 50, scaleX: 10 },
             { x: 150, y: 164 },
@@ -363,7 +386,9 @@ export const LEVELS = [
             { x: GAME_WIDTH - 400, y: GAME_HEIGHT - 400, moveType: 'vertical', distance: 150, duration: 2000 },
         ],
         coins: [],
-        powerups: [],
+        powerups: [
+            { type: 'shield', x: 150, y: 130 }
+        ],
         traps: [],
         enemies: [],
         boss: { type: 'gorilla', x: GAME_WIDTH / 2, y: GAME_HEIGHT - 150, attackPattern: 2 },
