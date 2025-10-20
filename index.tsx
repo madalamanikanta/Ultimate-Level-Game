@@ -1,5 +1,6 @@
 
 
+
 import Phaser from 'phaser';
 // FIX: Corrected typo in constant name from DAILY_CHallenge_REWARD to DAILY_CHALLENGE_REWARD.
 import { GAME_WIDTH, GAME_HEIGHT, PLAYER_SPEED, PLAYER_JUMP_VELOCITY, GRAVITY, SPEED_BOOST_MODIFIER, SPEED_BOOST_DURATION, JUMP_BOOST_MODIFIER, JUMP_BOOST_DURATION, ENEMY_SPEED, CHALLENGES, DAILY_CHALLENGE_REWARD, LEVELS, DASH_VELOCITY, DASH_DURATION, DASH_COOLDOWN, BOSS_HEALTH, TURTLE_ROLL_SPEED, COSMETICS, PARRY_WINDOW, PARRY_COOLDOWN, ENEMY_STUN_DURATION } from './constants';
@@ -3184,13 +3185,45 @@ class UIScene extends Phaser.Scene {
         const gameScene = this.scene.get('GameScene');
 
         this.scoreText = this.add.text(20, 20, 'Score: 0', { fontSize: 32, color: '#f7fafc', fontStyle: 'bold', stroke: '#2d3748', strokeThickness: 6 });
-        this.powerUpText = this.add.text(GAME_WIDTH - 20, 20, '', { fontSize: 24, color: '#f7fafc', fontStyle: 'bold', align: 'right' }).setOrigin(1, 0);
+        this.powerUpText = this.add.text(GAME_WIDTH - 90, 20, '', { fontSize: 24, color: '#f7fafc', fontStyle: 'bold', align: 'right' }).setOrigin(1, 0);
 
         this.challengeText = this.add.text(GAME_WIDTH / 2, 20, this.dailyChallenge.progressText(0), { fontSize: 24, color: '#f7fafc', fontStyle: 'bold' }).setOrigin(0.5, 0);
         if (this.isChallengeCompleted) {
             this.challengeText.setText('Daily Challenge Completed!');
             this.challengeText.setColor('#48bb78');
         }
+
+        // Add a pause button
+        const pauseButtonContainer = this.add.container(GAME_WIDTH - 50, 32.5);
+        const pauseIcon = this.add.graphics();
+        pauseIcon.fillStyle(0xf7fafc, 1);
+        pauseIcon.fillRect(-11.5, -12.5, 8, 25);
+        pauseIcon.fillRect(3.5, -12.5, 8, 25);
+        pauseButtonContainer.add(pauseIcon);
+        pauseButtonContainer.setSize(40, 40).setInteractive(); // Generous interactive area
+        pauseButtonContainer.setAlpha(0.8);
+
+        pauseButtonContainer.on('pointerover', () => {
+            pauseButtonContainer.setAlpha(1);
+        });
+
+        pauseButtonContainer.on('pointerout', () => {
+            pauseButtonContainer.setAlpha(0.8);
+        });
+
+        pauseButtonContainer.on('pointerdown', () => {
+            const gameSceneInstance = this.scene.get('GameScene') as GameScene;
+            if (gameSceneInstance && gameSceneInstance.scene.isActive()) {
+                gameSceneInstance.scene.pause();
+                this.scene.pause(); // Pause UIScene itself
+                this.scene.launch('PauseScene', {
+                    levelIndex: this.levelIndex,
+                    challenge: this.dailyChallenge,
+                    isCompleted: this.isChallengeCompleted,
+                    score: gameSceneInstance.initialScore
+                });
+            }
+        });
 
         gameScene.events.on('scoreChanged', () => {
             // FIX: Use the .text property to update text content, resolving a type error.
@@ -3235,7 +3268,7 @@ class UIScene extends Phaser.Scene {
             this.bossHealthBar.fillStyle(0xc53030);
             this.bossHealthBar.fillRect(GAME_WIDTH / 2 - 250, GAME_HEIGHT - 60, 500, 30);
             
-            // FIX: Using an intermediate variable and .text property assignment to bypass potential typing issue with add.text method.
+// FIX: The fontSize property must be a number, not a string.
             const bossTitle = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 75, '', { fontSize: 24, color: '#f7fafc', fontStyle: 'bold' }).setOrigin(0.5, 0);
             bossTitle.text = 'JUNGLE KING';
         }, this);
