@@ -215,7 +215,7 @@ export const LEVELS = [
         traps: [ { x: 350, y: GAME_HEIGHT - 50 } ],
         enemies: [
              { type: 'snake', x: 650, y: 200, velocityX: ENEMY_SPEED },
-             { type: 'bat', x: 450, y: 350 },
+             { type: 'beetle', x: 450, y: 350 },
         ],
         hazards: [ 
             { type: 'geyser', x: 400, y: GAME_HEIGHT - 50 },
@@ -281,6 +281,7 @@ export const LEVELS = [
         enemies: [
             { type: 'snake', x: 400, y: GAME_HEIGHT - 100, velocityX: ENEMY_SPEED },
             { type: 'turtle', x: 600, y: GAME_HEIGHT - 124 },
+            { type: 'spider', x: 800, y: GAME_HEIGHT - 150, patrolDistance: 100 },
         ],
         hazards: [ 
             { type: 'falling_rock_spawner', x: 870, y: 0, width: 300, height: GAME_HEIGHT },

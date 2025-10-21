@@ -1,6 +1,4 @@
 
-
-
 import Phaser from 'phaser';
 // FIX: Corrected typo in constant name from DAILY_CHallenge_REWARD to DAILY_CHALLENGE_REWARD.
 import { GAME_WIDTH, GAME_HEIGHT, PLAYER_SPEED, PLAYER_JUMP_VELOCITY, GRAVITY, SPEED_BOOST_MODIFIER, SPEED_BOOST_DURATION, JUMP_BOOST_MODIFIER, JUMP_BOOST_DURATION, ENEMY_SPEED, CHALLENGES, DAILY_CHALLENGE_REWARD, LEVELS, DASH_VELOCITY, DASH_DURATION, DASH_COOLDOWN, BOSS_HEALTH, TURTLE_ROLL_SPEED, COSMETICS, PARRY_WINDOW, PARRY_COOLDOWN, ENEMY_STUN_DURATION } from './constants';
@@ -288,6 +286,7 @@ class MainMenuScene extends Phaser.Scene {
     }
 
     create() {
+        this.cameras.main.fadeIn(250, 0, 0, 0);
         this.add.image(0, 0, 'background').setOrigin(0);
         this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 200, 'Ultimate Level Challenge', {
             fontSize: 64,
@@ -337,7 +336,11 @@ class MainMenuScene extends Phaser.Scene {
         startButton.on('pointerover', () => startButton.setBackgroundColor('#6b4a2b'));
         startButton.on('pointerout', () => startButton.setBackgroundColor('#8b5a2b'));
         startButton.on('pointerdown', () => {
-            this.scene.start('LevelSelectScene', { challenge: todayChallenge, isCompleted: isCompleted });
+            this.cameras.main.fadeOut(250, 0, 0, 0, (_camera, progress) => {
+                if (progress === 1) {
+                    this.scene.start('LevelSelectScene', { challenge: todayChallenge, isCompleted: isCompleted });
+                }
+            });
         });
         
         const customizeButton = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 170, 'Customize', {
@@ -351,7 +354,11 @@ class MainMenuScene extends Phaser.Scene {
         customizeButton.on('pointerover', () => customizeButton.setBackgroundColor('#2d3748'));
         customizeButton.on('pointerout', () => customizeButton.setBackgroundColor('#4a5568'));
         customizeButton.on('pointerdown', () => {
-            this.scene.start('CustomizationScene');
+            this.cameras.main.fadeOut(250, 0, 0, 0, (_camera, progress) => {
+                if (progress === 1) {
+                    this.scene.start('CustomizationScene');
+                }
+            });
         });
     }
 }
@@ -373,6 +380,7 @@ class CustomizationScene extends Phaser.Scene {
     }
 
     create() {
+        this.cameras.main.fadeIn(250, 0, 0, 0);
         this.add.image(0, 0, 'background').setOrigin(0);
 
         this.cosmeticsData = getCosmeticsData();
@@ -412,7 +420,11 @@ class CustomizationScene extends Phaser.Scene {
         saveButton.on('pointerdown', () => {
             this.cosmeticsData.equipped = this.currentSelection;
             saveCosmeticsData(this.cosmeticsData);
-            this.scene.start('MainMenuScene');
+            this.cameras.main.fadeOut(250, 0, 0, 0, (_camera, progress) => {
+                if (progress === 1) {
+                    this.scene.start('MainMenuScene');
+                }
+            });
         });
         
         // Tooltip for locked items
@@ -545,6 +557,7 @@ class LevelSelectScene extends Phaser.Scene {
     }
 
     create() {
+        this.cameras.main.fadeIn(250, 0, 0, 0);
         this.add.image(0, 0, 'background').setOrigin(0);
 
         this.add.text(GAME_WIDTH / 2, 80, 'Select Level', {
@@ -639,16 +652,20 @@ class LevelSelectScene extends Phaser.Scene {
                 });
 
                 buttonContainer.on('pointerdown', () => {
-                    this.scene.start('GameScene', {
-                        challenge: this.dailyChallenge,
-                        isCompleted: this.isChallengeCompleted,
-                        levelIndex: index,
-                        score: 0
-                    });
-                    this.scene.launch('UIScene', {
-                        challenge: this.dailyChallenge,
-                        isCompleted: this.isChallengeCompleted,
-                        levelIndex: index
+                    this.cameras.main.fadeOut(250, 0, 0, 0, (_camera, progress) => {
+                        if (progress === 1) {
+                            this.scene.start('GameScene', {
+                                challenge: this.dailyChallenge,
+                                isCompleted: this.isChallengeCompleted,
+                                levelIndex: index,
+                                score: 0
+                            });
+                            this.scene.launch('UIScene', {
+                                challenge: this.dailyChallenge,
+                                isCompleted: this.isChallengeCompleted,
+                                levelIndex: index
+                            });
+                        }
                     });
                 });
             }
@@ -665,7 +682,13 @@ class LevelSelectScene extends Phaser.Scene {
 
         backButton.on('pointerover', () => backButton.setColor('#f6e05e'));
         backButton.on('pointerout', () => backButton.setColor('#f7fafc'));
-        backButton.on('pointerdown', () => this.scene.start('MainMenuScene'));
+        backButton.on('pointerdown', () => {
+            this.cameras.main.fadeOut(250, 0, 0, 0, (_camera, progress) => {
+                if (progress === 1) {
+                    this.scene.start('MainMenuScene');
+                }
+            });
+        });
     }
 }
 
@@ -789,6 +812,9 @@ class GameScene extends Phaser.Scene {
     private readonly JUMP_BUFFER = 100; // ms
     private readonly HORIZONTAL_ACCELERATION = 2000;
     private readonly HORIZONTAL_DRAG = 2500;
+
+    // New Enemy Properties
+    private spiderProjectiles!: Phaser.Physics.Arcade.Group;
 
 
     constructor() {
@@ -995,6 +1021,49 @@ class GameScene extends Phaser.Scene {
         batGraphics.fillCircle(28, 22, 2);
         batGraphics.generateTexture('enemy_bat', 48, 48);
         batGraphics.destroy();
+        
+        // NEW ENEMY: Flying Beetle
+        const beetleGraphics = this.make.graphics();
+        beetleGraphics.fillStyle(0x5a3a22); // Dark brown body
+        beetleGraphics.fillEllipse(24, 24, 30, 20);
+        beetleGraphics.fillStyle(0xa0aec0, 0.8); // Grey wings
+        beetleGraphics.fillEllipse(16, 16, 16, 10);
+        beetleGraphics.fillEllipse(32, 16, 16, 10);
+        beetleGraphics.fillStyle(0xc53030); // Red eye
+        beetleGraphics.fillCircle(14, 22, 3);
+        beetleGraphics.generateTexture('enemy_beetle', 48, 48);
+        beetleGraphics.destroy();
+
+        // NEW ENEMY: Spitting Spider
+        const spiderGraphics = this.make.graphics();
+        spiderGraphics.fillStyle(0x2d3748); // Dark grey body
+        spiderGraphics.fillEllipse(24, 24, 24, 18); // body
+        spiderGraphics.lineStyle(4, 0x2d3748); // legs
+        spiderGraphics.beginPath();
+        // Top legs
+        spiderGraphics.moveTo(16, 18); spiderGraphics.lineTo(4, 8);
+        spiderGraphics.moveTo(18, 16); spiderGraphics.lineTo(8, 4);
+        spiderGraphics.moveTo(30, 16); spiderGraphics.lineTo(40, 4);
+        spiderGraphics.moveTo(32, 18); spiderGraphics.lineTo(44, 8);
+        // Bottom legs
+        spiderGraphics.moveTo(16, 30); spiderGraphics.lineTo(4, 40);
+        spiderGraphics.moveTo(18, 32); spiderGraphics.lineTo(8, 44);
+        spiderGraphics.moveTo(30, 32); spiderGraphics.lineTo(40, 44);
+        spiderGraphics.moveTo(32, 30); spiderGraphics.lineTo(44, 40);
+        spiderGraphics.strokePath();
+        spiderGraphics.fillStyle(0xc53030); // Red hourglass
+        spiderGraphics.fillTriangle(24, 22, 20, 28, 28, 28);
+        spiderGraphics.generateTexture('enemy_spider', 48, 48);
+        spiderGraphics.destroy();
+        
+        // NEW: Spider Venom Projectile
+        const venomGraphics = this.make.graphics();
+        venomGraphics.fillStyle(0x48bb78); // Green
+        venomGraphics.fillCircle(8, 8, 6);
+        venomGraphics.fillStyle(0x38a169, 0.7); // Darker green highlight
+        venomGraphics.fillCircle(6, 6, 2);
+        venomGraphics.generateTexture('projectile_venom', 16, 16);
+        venomGraphics.destroy();
 
         // Enemy - Spiky Turtle
         const turtleGraphics = this.make.graphics();
@@ -1247,6 +1316,7 @@ class GameScene extends Phaser.Scene {
     }
 
     create() {
+        this.cameras.main.fadeIn(250, 0, 0, 0);
         this.sound.play('background_music', { loop: true, volume: 0.5 });
         this.events.on('pause', () => this.sound.pauseAll());
         this.events.on('resume', () => this.sound.resumeAll());
@@ -1434,6 +1504,7 @@ class GameScene extends Phaser.Scene {
             });
         }
 
+        this.spiderProjectiles = this.physics.add.group({ allowGravity: false });
 
         this.enemies = this.physics.add.group();
         if (!this.isBossLevel && level.enemies) {
@@ -1452,6 +1523,26 @@ class GameScene extends Phaser.Scene {
                     enemy.setData('isRolling', false);
                     enemy.setCollideWorldBounds(true);
                     (enemy.body as Phaser.Physics.Arcade.Body).setImmovable(true);
+                } else if (e.type === 'beetle') {
+                    const enemy = this.enemies.create(e.x, e.y, 'enemy_beetle') as Phaser.Physics.Arcade.Sprite;
+                    (enemy.body as Phaser.Physics.Arcade.Body).setAllowGravity(false);
+                    enemy.setData('type', 'beetle');
+                    enemy.setData('isCharging', false);
+                    enemy.setData('originPos', { x: e.x, y: e.y });
+                    enemy.setCollideWorldBounds(true);
+                } else if (e.type === 'spider') {
+                    const enemy = this.enemies.create(e.x, e.y, 'enemy_spider') as Phaser.Physics.Arcade.Sprite;
+                    (enemy.body as Phaser.Physics.Arcade.Body).setAllowGravity(false);
+                    enemy.setData('type', 'spider');
+                    enemy.setData('lastSpit', 0);
+                    this.tweens.add({
+                        targets: enemy,
+                        y: e.y + (e.patrolDistance || 100),
+                        duration: 3000,
+                        yoyo: true,
+                        repeat: -1,
+                        ease: 'Sine.easeInOut'
+                    });
                 } else { // Default to snake
                     const enemy = this.enemies.create(e.x, e.y, 'enemy') as Phaser.Physics.Arcade.Sprite;
                     enemy.setData('type', 'snake');
@@ -1545,6 +1636,10 @@ class GameScene extends Phaser.Scene {
         this.physics.add.overlap(this.player, this.fallingRocks, this.hitByHazard, undefined, this);
         this.physics.add.overlap(this.player, this.geysers, this.hitByGeyser, undefined, this);
         
+        // New Enemy Colliders
+        this.physics.add.overlap(this.player, this.spiderProjectiles, this.hitBySpiderVenom, undefined, this);
+        this.physics.add.collider(this.spiderProjectiles, this.platforms, (p) => p.destroy(), undefined, this);
+
         // Visuals Colliders
         this.physics.add.collider(this.drips, this.platforms, this.handleDripSplash, undefined, this);
         this.physics.add.collider(this.drips, this.movingPlatforms, this.handleDripSplash, undefined, this);
@@ -1772,6 +1867,58 @@ class GameScene extends Phaser.Scene {
                         });
                     }
                 }
+            } else if (type === 'beetle') {
+                const isCharging = enemy.getData('isCharging');
+                const lastCharge = enemy.getData('lastCharge') || 0;
+                const chargeCooldown = 3000;
+
+                if (!isCharging && this.time.now > lastCharge + chargeCooldown) {
+                    const distanceToPlayerX = Math.abs(this.player.x - enemy.x);
+                    const distanceToPlayerY = Math.abs(this.player.y - enemy.y);
+
+                    if (this.player.active && distanceToPlayerX < 400 && distanceToPlayerY < 100) {
+                        enemy.setData('isCharging', true);
+                        this.physics.moveToObject(enemy, this.player, 400);
+
+                        this.time.delayedCall(1500, () => {
+                            if (!enemy.active) return;
+                            enemy.setVelocity(0, 0);
+
+                            const originPos = enemy.getData('originPos');
+                            this.tweens.add({
+                                targets: enemy,
+                                x: originPos.x,
+                                y: originPos.y,
+                                duration: 1000,
+                                ease: 'Power2',
+                                onComplete: () => {
+                                    if (enemy.active) {
+                                        enemy.setData('isCharging', false);
+                                        enemy.setData('lastCharge', this.time.now);
+                                    }
+                                }
+                            });
+                        });
+                    }
+                }
+                if (enemy.body.velocity.x !== 0) {
+                    enemy.setFlipX(enemy.body.velocity.x < 0);
+                }
+            } else if (type === 'spider') {
+                const lastSpit = enemy.getData('lastSpit') || 0;
+                const spitCooldown = 2500;
+
+                if (this.time.now > lastSpit + spitCooldown) {
+                    const distanceToPlayer = Phaser.Math.Distance.Between(this.player.x, this.player.y, enemy.x, enemy.y);
+                    if (this.player.active && distanceToPlayer < 500 && this.player.y > enemy.y) {
+                        enemy.setData('lastSpit', this.time.now);
+                        const venom = this.spiderProjectiles.create(enemy.x, enemy.y, 'projectile_venom');
+                        if (venom) {
+                           this.physics.moveToObject(venom, this.player, 300);
+                        }
+                    }
+                }
+                enemy.setFlipX(this.player.x < enemy.x);
             }
         });
         
@@ -2173,6 +2320,7 @@ class GameScene extends Phaser.Scene {
 
         if (enemySprite.getData('isStunned')) {
             this.enemyDefeatEmitter?.explode(15, enemySprite.x, enemySprite.y);
+            this.tweens.killTweensOf(enemySprite);
             enemySprite.destroy();
             this.levelEnemiesDefeated++;
             return;
@@ -2196,6 +2344,7 @@ class GameScene extends Phaser.Scene {
 
         if (wasAbove) {
             this.enemyDefeatEmitter?.explode(15, enemySprite.x, enemySprite.y);
+            this.tweens.killTweensOf(enemySprite);
             enemySprite.destroy();
             this.levelEnemiesDefeated++;
             playerSprite.setVelocityY(-300);
@@ -2227,8 +2376,12 @@ class GameScene extends Phaser.Scene {
         this.playerHat?.setTint(0xff0000);
 
         this.time.delayedCall(500, () => {
-             this.scene.stop('UIScene');
-             this.scene.start('GameOverScene');
+             this.cameras.main.fadeOut(500, 0, 0, 0, (_camera, progress) => {
+                if (progress === 1) {
+                    this.scene.stop('UIScene');
+                    this.scene.start('GameOverScene');
+                }
+             });
         });
     }
     
@@ -2300,6 +2453,7 @@ class GameScene extends Phaser.Scene {
     showUnlockMessage(message: string) {
         const unlockText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 150, message, {
             // FIX: The fontSize property must be a number, not a string.
+// FIX: Changed fontSize to a number to match type definitions.
             fontSize: 48,
             color: '#4299e1',
             fontStyle: 'bold',
@@ -2354,6 +2508,7 @@ class GameScene extends Phaser.Scene {
 
             this.challengeCompleteText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 100, 'Challenge Complete!', {
                 // FIX: The fontSize property must be a number, not a string.
+// FIX: Changed fontSize to a number to match type definitions.
                 fontSize: 48,
                 color: '#48bb78',
                 fontStyle: 'bold',
@@ -2393,6 +2548,11 @@ class GameScene extends Phaser.Scene {
         
         this.player.setVelocityY(PLAYER_JUMP_VELOCITY * 0.9);
         this.canDoubleJump = false;
+        this.takeDamage();
+    }
+
+    hitBySpiderVenom(player: Phaser.Types.Physics.Arcade.GameObjectWithBody, venom: Phaser.Types.Physics.Arcade.GameObjectWithBody) {
+        (venom as Phaser.Physics.Arcade.Sprite).destroy();
         this.takeDamage();
     }
     
@@ -2437,6 +2597,7 @@ class GameScene extends Phaser.Scene {
 
         const hintText = this.add.text(GAME_WIDTH / 2, 100, text, {
             // FIX: The fontSize property must be a number, not a string.
+// FIX: Changed fontSize to a number to match type definitions.
             fontSize: 32,
             color: '#f7fafc',
             fontStyle: 'bold',
@@ -2463,6 +2624,7 @@ class GameScene extends Phaser.Scene {
 
         const bossName = this.add.text(this.boss.x, this.boss.y - 120, 'JUNGLE KING', {
             // FIX: The fontSize property must be a number, not a string.
+// FIX: Changed fontSize to a number to match type definitions.
             fontSize: 48,
             color: '#f7fafc',
             fontStyle: 'bold',
@@ -2472,6 +2634,7 @@ class GameScene extends Phaser.Scene {
 
         const fightText = this.add.text(this.cameras.main.centerX, this.cameras.main.centerY, 'FIGHT!', {
             // FIX: The fontSize property must be a number, not a string.
+// FIX: Changed fontSize to a number to match type definitions.
             fontSize: 96,
             color: '#f6e05e',
             fontStyle: 'bold',
@@ -2899,6 +3062,7 @@ class LevelCompleteScene extends Phaser.Scene {
 
         this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 200, 'Level Complete!', {
             // FIX: The fontSize property must be a number, not a string.
+// FIX: Changed fontSize to a number to match type definitions.
             fontSize: 48, color: '#2d3748', fontStyle: 'bold'
         }).setOrigin(0.5);
 
@@ -2949,16 +3113,20 @@ class LevelCompleteScene extends Phaser.Scene {
         continueButton.on('pointerover', () => continueButton.setBackgroundColor('#2f855a'));
         continueButton.on('pointerout', () => continueButton.setBackgroundColor('#38a169'));
         continueButton.on('pointerdown', () => {
-            if (isLastLevel) {
-                // FIX: Ensure newTotalScore is a number before passing it to the next scene.
-                this.scene.start('GameCompleteScene', { finalScore: Number(stats.newTotalScore) });
-            } else {
-                 // Return to level select to see newly unlocked levels
-                this.scene.start('LevelSelectScene', {
-                    challenge: stats.challenge,
-                    isCompleted: stats.isCompletedForSession
-                });
-            }
+            this.cameras.main.fadeOut(250, 0, 0, 0, (_camera, progress) => {
+                if (progress === 1) {
+                    if (isLastLevel) {
+                        // FIX: Ensure newTotalScore is a number before passing it to the next scene.
+                        this.scene.start('GameCompleteScene', { finalScore: Number(stats.newTotalScore) });
+                    } else {
+                         // Return to level select to see newly unlocked levels
+                        this.scene.start('LevelSelectScene', {
+                            challenge: stats.challenge,
+                            isCompleted: stats.isCompletedForSession
+                        });
+                    }
+                }
+            });
         });
     }
 }
@@ -2985,11 +3153,13 @@ class GameCompleteScene extends Phaser.Scene {
     }
 
     create() {
+        this.cameras.main.fadeIn(250, 0, 0, 0);
         this.scene.get('GameScene').sound.stopAll();
         this.add.image(0, 0, 'background').setOrigin(0);
 
         this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 150, 'Congratulations!', {
             // FIX: The fontSize property must be a number, not a string.
+// FIX: Changed fontSize to a number to match type definitions.
             fontSize: 80,
             color: '#f6e05e', // Gold color
             fontStyle: 'bold',
@@ -3025,7 +3195,11 @@ class GameCompleteScene extends Phaser.Scene {
         menuButton.on('pointerover', () => menuButton.setBackgroundColor('#2f855a'));
         menuButton.on('pointerout', () => menuButton.setBackgroundColor('#38a169'));
         menuButton.on('pointerdown', () => {
-            this.scene.start('MainMenuScene');
+            this.cameras.main.fadeOut(250, 0, 0, 0, (_camera, progress) => {
+                if (progress === 1) {
+                    this.scene.start('MainMenuScene');
+                }
+            });
         });
         
         this.add.particles('confetti', undefined, {
@@ -3048,6 +3222,7 @@ class GameOverScene extends Phaser.Scene {
     }
 
     create() {
+        this.cameras.main.fadeIn(250, 0, 0, 0);
         this.scene.get('GameScene').sound.stopAll();
         this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 100, 'Game Over', {
             fontSize: 64,
@@ -3066,16 +3241,20 @@ class GameOverScene extends Phaser.Scene {
         retryButton.on('pointerover', () => retryButton.setBackgroundColor('#6b4a2b'));
         retryButton.on('pointerout', () => retryButton.setBackgroundColor('#8b5a2b'));
         retryButton.on('pointerdown', () => {
-            // FIX: Corrected unsafe type casting from Scene to GameScene.
-            const gameScene = this.scene.get('GameScene') as unknown as GameScene;
-            const data = {
-                levelIndex: gameScene.levelIndex,
-                score: gameScene.initialScore,
-                challenge: gameScene.dailyChallenge,
-                isCompleted: gameScene.isChallengeCompleted
-            };
-            this.scene.start('GameScene', data);
-            this.scene.launch('UIScene', data);
+            this.cameras.main.fadeOut(250, 0, 0, 0, (_camera, progress) => {
+                if (progress === 1) {
+                    // FIX: Corrected unsafe type casting from Scene to GameScene.
+                    const gameScene = this.scene.get('GameScene') as unknown as GameScene;
+                    const data = {
+                        levelIndex: gameScene.levelIndex,
+                        score: gameScene.initialScore,
+                        challenge: gameScene.dailyChallenge,
+                        isCompleted: gameScene.isChallengeCompleted
+                    };
+                    this.scene.start('GameScene', data);
+                    this.scene.launch('UIScene', data);
+                }
+            });
         });
 
         const menuButton = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 120, 'Main Menu', {
@@ -3088,7 +3267,13 @@ class GameOverScene extends Phaser.Scene {
 
         menuButton.on('pointerover', () => menuButton.setBackgroundColor('#2d3748'));
         menuButton.on('pointerout', () => menuButton.setBackgroundColor('#4a5568'));
-        menuButton.on('pointerdown', () => this.scene.start('MainMenuScene'));
+        menuButton.on('pointerdown', () => {
+            this.cameras.main.fadeOut(250, 0, 0, 0, (_camera, progress) => {
+                if (progress === 1) {
+                    this.scene.start('MainMenuScene');
+                }
+            });
+        });
     }
 }
 
@@ -3133,10 +3318,14 @@ class PauseScene extends Phaser.Scene {
         restartButton.on('pointerover', () => restartButton.setBackgroundColor('#6b4a2b'));
         restartButton.on('pointerout', () => restartButton.setBackgroundColor('#8b5a2b'));
         restartButton.on('pointerdown', () => {
-            this.scene.stop('GameScene');
-            this.scene.stop('UIScene');
-            this.scene.start('GameScene', this.previousSceneData);
-            this.scene.launch('UIScene', this.previousSceneData);
+            this.cameras.main.fadeOut(250, 0, 0, 0, (_camera, progress) => {
+                if (progress === 1) {
+                    this.scene.stop('GameScene');
+                    this.scene.stop('UIScene');
+                    this.scene.start('GameScene', this.previousSceneData);
+                    this.scene.launch('UIScene', this.previousSceneData);
+                }
+            });
         });
 
         const menuButton = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 190, 'Main Menu', {
@@ -3146,9 +3335,13 @@ class PauseScene extends Phaser.Scene {
         menuButton.on('pointerover', () => menuButton.setBackgroundColor('#2d3748'));
         menuButton.on('pointerout', () => menuButton.setBackgroundColor('#4a5568'));
         menuButton.on('pointerdown', () => {
-            this.scene.stop('GameScene');
-            this.scene.stop('UIScene');
-            this.scene.start('MainMenuScene');
+            this.cameras.main.fadeOut(250, 0, 0, 0, (_camera, progress) => {
+                if (progress === 1) {
+                    this.scene.stop('GameScene');
+                    this.scene.stop('UIScene');
+                    this.scene.start('MainMenuScene');
+                }
+            });
         });
     }
 }
@@ -3268,7 +3461,8 @@ class UIScene extends Phaser.Scene {
             this.bossHealthBar.fillStyle(0xc53030);
             this.bossHealthBar.fillRect(GAME_WIDTH / 2 - 250, GAME_HEIGHT - 60, 500, 30);
             
-// FIX: The fontSize property must be a number, not a string.
+            // FIX: The fontSize property must be a number, not a string.
+// FIX: Changed fontSize to a number to match type definitions.
             const bossTitle = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 75, '', { fontSize: 24, color: '#f7fafc', fontStyle: 'bold' }).setOrigin(0.5, 0);
             bossTitle.text = 'JUNGLE KING';
         }, this);
@@ -3325,6 +3519,7 @@ class UIScene extends Phaser.Scene {
         const dashLabel = this.add.text(55, abilityY, '', { fontSize: 14, color: '#fff', fontStyle: 'bold'}).setOrigin(0.5);
         dashLabel.text = 'DASH';
         // FIX: The fontSize property must be a number, not a string.
+// FIX: Changed fontSize to a number to match type definitions.
         this.dashCooldownText = this.add.text(55, abilityY, '', { fontSize: 24, color: '#fff', fontStyle: 'bold'}).setOrigin(0.5);
 
         // Parry UI
@@ -3334,6 +3529,8 @@ class UIScene extends Phaser.Scene {
         // FIX: Using an intermediate variable and .text property assignment to bypass potential typing issue with add.text method.
         const parryLabel = this.add.text(115, abilityY, '', { fontSize: 12, color: '#fff', fontStyle: 'bold'}).setOrigin(0.5);
         parryLabel.text = 'PARRY';
+        // FIX: Changed fontSize to a number to match type definitions.
+// FIX: Changed fontSize to a number to match type definitions.
         this.parryCooldownText = this.add.text(115, abilityY, '', { fontSize: 24, color: '#fff', fontStyle: 'bold'}).setOrigin(0.5);
 
         gameScene.events.on('dashStatusChanged', (data: { ready: boolean; cooldown: number; }) => {
