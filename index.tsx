@@ -1,4 +1,3 @@
-
 import Phaser from 'phaser';
 // FIX: Corrected typo in constant name from DAILY_CHallenge_REWARD to DAILY_CHALLENGE_REWARD.
 import { GAME_WIDTH, GAME_HEIGHT, PLAYER_SPEED, PLAYER_JUMP_VELOCITY, GRAVITY, SPEED_BOOST_MODIFIER, SPEED_BOOST_DURATION, JUMP_BOOST_MODIFIER, JUMP_BOOST_DURATION, ENEMY_SPEED, CHALLENGES, DAILY_CHALLENGE_REWARD, LEVELS, DASH_VELOCITY, DASH_DURATION, DASH_COOLDOWN, BOSS_HEALTH, TURTLE_ROLL_SPEED, COSMETICS, PARRY_WINDOW, PARRY_COOLDOWN, ENEMY_STUN_DURATION } from './constants';
@@ -57,146 +56,258 @@ class MainMenuScene extends Phaser.Scene {
         super({ key: 'MainMenuScene' });
     }
     
+    private drawPlayerFrame(key: string, drawCallback: (g: Phaser.GameObjects.Graphics) => void) {
+        if (this.textures.exists(key)) return;
+        const g = this.make.graphics({x: 0, y: 0});
+        drawCallback(g);
+        g.generateTexture(key, 64, 68);
+        g.destroy();
+    }
+
     preload() {
-        const bgGraphics = this.make.graphics();
-        bgGraphics.fillStyle(0x87ceeb);
-        bgGraphics.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
-        bgGraphics.fillStyle(0x1e4620, 0.5);
-        for (let i = 0; i < 15; i++) {
-            const x = Math.random() * GAME_WIDTH;
-            const h = 100 + Math.random() * 150;
-            const w = 40 + Math.random() * 40;
-            bgGraphics.fillEllipse(x, GAME_HEIGHT - h/2 + 50, w, h);
+        if (!this.textures.exists('background')) {
+            const bgGraphics = this.make.graphics();
+            bgGraphics.fillStyle(0x87ceeb);
+            bgGraphics.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+            bgGraphics.fillStyle(0x1e4620, 0.5);
+            for (let i = 0; i < 15; i++) {
+                const x = Math.random() * GAME_WIDTH;
+                const h = 100 + Math.random() * 150;
+                const w = 40 + Math.random() * 40;
+                bgGraphics.fillEllipse(x, GAME_HEIGHT - h/2 + 50, w, h);
+            }
+             bgGraphics.fillStyle(0x2f6b2f, 0.7);
+            for (let i = 0; i < 20; i++) {
+                const x = Math.random() * GAME_WIDTH;
+                const h = 150 + Math.random() * 200;
+                const w = 50 + Math.random() * 50;
+                bgGraphics.fillEllipse(x, GAME_HEIGHT - h/2 + 80, w, h);
+            }
+            bgGraphics.generateTexture('background', GAME_WIDTH, GAME_HEIGHT);
+            bgGraphics.destroy();
         }
-         bgGraphics.fillStyle(0x2f6b2f, 0.7);
-        for (let i = 0; i < 20; i++) {
-            const x = Math.random() * GAME_WIDTH;
-            const h = 150 + Math.random() * 200;
-            const w = 50 + Math.random() * 50;
-            bgGraphics.fillEllipse(x, GAME_HEIGHT - h/2 + 80, w, h);
-        }
-        bgGraphics.generateTexture('background', GAME_WIDTH, GAME_HEIGHT);
-        bgGraphics.destroy();
+
+        // MOVED FROM GameScene: Player animation frames for CustomizationScene preview
+        const drawBody = (g: Phaser.GameObjects.Graphics) => {
+            g.fillStyle(0x8b5a2b); // Torso/Arms base color
+            g.fillRect(22, 24, 20, 16);
+            g.fillStyle(0xffd3a9); // Head
+            g.fillRect(24, 8, 16, 16);
+            g.fillStyle(0x4a5568); // Shorts
+            g.fillRect(20, 40, 24, 18);
+        };
+
+        this.drawPlayerFrame('avatar_idle', g => {
+            drawBody(g);
+            g.fillStyle(0x5a3a22); // Boots
+            g.fillRect(22, 58, 8, 10);
+            g.fillRect(34, 58, 8, 10);
+        });
+
+        this.drawPlayerFrame('avatar_run_1', g => {
+            drawBody(g);
+            g.fillStyle(0x5a3a22); // Boots
+            g.fillRect(16, 58, 8, 10); // Back leg
+            g.fillRect(40, 58, 8, 10); // Front leg
+        });
+        
+        this.drawPlayerFrame('avatar_run_2', g => {
+            drawBody(g);
+            g.fillStyle(0x5a3a22); // Boots
+            g.fillRect(40, 58, 8, 10); // Back leg
+            g.fillRect(16, 58, 8, 10); // Front leg
+        });
+
+        this.drawPlayerFrame('avatar_jump', g => {
+            drawBody(g);
+            g.fillStyle(0x5a3a22); // Boots
+            g.fillRect(22, 52, 8, 8); // Tucked legs
+            g.fillRect(34, 52, 8, 8);
+        });
+
+        this.drawPlayerFrame('avatar_hurt', g => {
+            drawBody(g);
+            g.fillStyle(0x5a3a22); // Boots
+            g.fillRect(22, 58, 8, 10);
+            g.fillRect(34, 58, 8, 10);
+            // Add 'X' eyes for hurt state
+            g.lineStyle(2, 0x000000);
+            g.beginPath();
+            // Left eye
+            g.moveTo(26, 12); g.lineTo(30, 16);
+            g.moveTo(30, 12); g.lineTo(26, 16);
+            // Right eye
+            g.moveTo(34, 12); g.lineTo(38, 16);
+            g.moveTo(38, 12); g.lineTo(34, 16);
+            g.strokePath();
+        });
+
+        this.drawPlayerFrame('avatar_climb', g => {
+            drawBody(g);
+            g.fillStyle(0x8b5a2b); // Raised arms
+            g.fillRect(18, 16, 8, 8);
+            g.fillRect(38, 16, 8, 8);
+            g.fillStyle(0x5a3a22); // Boots
+            g.fillRect(22, 58, 8, 10);
+            g.fillRect(34, 58, 8, 10);
+        });
         
         // Pre-generate cosmetic hat textures
-        const fedoraGraphics = this.make.graphics();
-        fedoraGraphics.fillStyle(0x8b5a2b);
-        fedoraGraphics.slice(16, 12, 14, Phaser.Math.DegToRad(200), Phaser.Math.DegToRad(340), true).fillPath();
-        fedoraGraphics.fillStyle(0x2d3748);
-        fedoraGraphics.fillRect(4, 11, 24, 4);
-        fedoraGraphics.generateTexture('hat_fedora', 32, 16);
-        fedoraGraphics.destroy();
+        if (!this.textures.exists('hat_fedora')) {
+            const fedoraGraphics = this.make.graphics();
+            fedoraGraphics.fillStyle(0x8b5a2b);
+            fedoraGraphics.slice(16, 12, 14, Phaser.Math.DegToRad(200), Phaser.Math.DegToRad(340), true).fillPath();
+            fedoraGraphics.fillStyle(0x2d3748);
+            fedoraGraphics.fillRect(4, 11, 24, 4);
+            fedoraGraphics.generateTexture('hat_fedora', 32, 16);
+            fedoraGraphics.destroy();
+        }
 
-        const pithGraphics = this.make.graphics();
-        pithGraphics.fillStyle(0xf0e68c);
-        pithGraphics.fillEllipse(16, 8, 30, 14);
-        pithGraphics.fillStyle(0x6b4a2b);
-        pithGraphics.fillRect(2, 7, 28, 3);
-        pithGraphics.generateTexture('hat_pith', 32, 16);
-        pithGraphics.destroy();
+        if (!this.textures.exists('hat_pith')) {
+            const pithGraphics = this.make.graphics();
+            pithGraphics.fillStyle(0xf0e68c);
+            pithGraphics.fillEllipse(16, 8, 30, 14);
+            pithGraphics.fillStyle(0x6b4a2b);
+            pithGraphics.fillRect(2, 7, 28, 3);
+            pithGraphics.generateTexture('hat_pith', 32, 16);
+            pithGraphics.destroy();
+        }
         
-        const tophatGraphics = this.make.graphics();
-        tophatGraphics.fillStyle(0x2d3748);
-        tophatGraphics.fillRect(0, 12, 32, 4);
-        tophatGraphics.fillRect(6, 0, 20, 12);
-        tophatGraphics.fillStyle(0xc53030);
-        tophatGraphics.fillRect(6, 9, 20, 3);
-        tophatGraphics.generateTexture('hat_tophat', 32, 16);
-        tophatGraphics.destroy();
+        if (!this.textures.exists('hat_tophat')) {
+            const tophatGraphics = this.make.graphics();
+            tophatGraphics.fillStyle(0x2d3748);
+            tophatGraphics.fillRect(0, 12, 32, 4);
+            tophatGraphics.fillRect(6, 0, 20, 12);
+            tophatGraphics.fillStyle(0xc53030);
+            tophatGraphics.fillRect(6, 9, 20, 3);
+            tophatGraphics.generateTexture('hat_tophat', 32, 16);
+            tophatGraphics.destroy();
+        }
         
-        const crownGraphics = this.make.graphics();
-        crownGraphics.fillStyle(0xf6e05e);
-        crownGraphics.beginPath();
-        crownGraphics.moveTo(4, 14);
-        crownGraphics.lineTo(4, 2);
-        crownGraphics.lineTo(10, 8);
-        crownGraphics.lineTo(16, 2);
-        crownGraphics.lineTo(22, 8);
-        crownGraphics.lineTo(28, 2);
-        crownGraphics.lineTo(28, 14);
-        crownGraphics.closePath();
-        crownGraphics.fillPath();
-        crownGraphics.fillStyle(0xc53030);
-        crownGraphics.fillCircle(16, 12, 3);
-        crownGraphics.generateTexture('hat_crown', 32, 16);
-        crownGraphics.destroy();
+        if (!this.textures.exists('hat_crown')) {
+            const crownGraphics = this.make.graphics();
+            crownGraphics.fillStyle(0xf6e05e);
+            crownGraphics.beginPath();
+            crownGraphics.moveTo(4, 14);
+            crownGraphics.lineTo(4, 2);
+            crownGraphics.lineTo(10, 8);
+            crownGraphics.lineTo(16, 2);
+            crownGraphics.lineTo(22, 8);
+            crownGraphics.lineTo(28, 2);
+            crownGraphics.lineTo(28, 14);
+            crownGraphics.closePath();
+            crownGraphics.fillPath();
+            crownGraphics.fillStyle(0xc53030);
+            crownGraphics.fillCircle(16, 12, 3);
+            crownGraphics.generateTexture('hat_crown', 32, 16);
+            crownGraphics.destroy();
+        }
+
+        // Coin - Banana (Moved from GameScene to be globally available for UI)
+        if (!this.textures.exists('coin')) {
+            const coinGraphics = this.make.graphics();
+            coinGraphics.fillStyle(0xf6e05e);
+            coinGraphics.beginPath();
+            // Draw a crescent/banana shape using two arcs
+            coinGraphics.arc(16, 30, 14, Phaser.Math.DegToRad(180), Phaser.Math.DegToRad(360), false);
+            coinGraphics.arc(16, 25, 12, Phaser.Math.DegToRad(0), Phaser.Math.DegToRad(180), true);
+            coinGraphics.closePath();
+            coinGraphics.fillPath();
+            // Add a small brown stem
+            coinGraphics.fillStyle(0x6b4a2b);
+            coinGraphics.fillRect(27, 16, 3, 5);
+            coinGraphics.generateTexture('coin', 32, 32);
+            coinGraphics.destroy();
+        }
 
         // UI Progress Bar Icons
-        const playerMarkerGraphics = this.make.graphics();
-        playerMarkerGraphics.fillStyle(0xffd3a9); // Player head color
-        playerMarkerGraphics.fillCircle(8, 8, 8);
-        playerMarkerGraphics.lineStyle(2, 0x5a3a22);
-        playerMarkerGraphics.strokeCircle(8, 8, 8);
-        playerMarkerGraphics.generateTexture('player_marker_icon', 16, 16);
-        playerMarkerGraphics.destroy();
+        if (!this.textures.exists('player_marker_icon')) {
+            const playerMarkerGraphics = this.make.graphics();
+            playerMarkerGraphics.fillStyle(0xffd3a9); // Player head color
+            playerMarkerGraphics.fillCircle(8, 8, 8);
+            playerMarkerGraphics.lineStyle(2, 0x5a3a22);
+            playerMarkerGraphics.strokeCircle(8, 8, 8);
+            playerMarkerGraphics.generateTexture('player_marker_icon', 16, 16);
+            playerMarkerGraphics.destroy();
+        }
 
-        const goalMarkerGraphics = this.make.graphics();
-        goalMarkerGraphics.fillStyle(0x6b4a2b); // Pole
-        goalMarkerGraphics.fillRect(4, 0, 4, 16);
-        goalMarkerGraphics.fillStyle(0x9b2c2c); // Red flag
-        goalMarkerGraphics.fillTriangle(8, 0, 8, 8, 16, 4);
-        goalMarkerGraphics.generateTexture('goal_marker_icon', 16, 16);
-        goalMarkerGraphics.destroy();
+        if (!this.textures.exists('goal_marker_icon')) {
+            const goalMarkerGraphics = this.make.graphics();
+            goalMarkerGraphics.fillStyle(0x6b4a2b); // Pole
+            goalMarkerGraphics.fillRect(4, 0, 4, 16);
+            goalMarkerGraphics.fillStyle(0x9b2c2c); // Red flag
+            goalMarkerGraphics.fillTriangle(8, 0, 8, 8, 16, 4);
+            goalMarkerGraphics.generateTexture('goal_marker_icon', 16, 16);
+            goalMarkerGraphics.destroy();
+        }
 
         // Level Complete Screen Icons
-        const clockIconGraphics = this.make.graphics();
-        clockIconGraphics.fillStyle(0xedf2f7);
-        clockIconGraphics.fillCircle(16, 16, 14);
-        clockIconGraphics.fillStyle(0x2d3748);
-        clockIconGraphics.fillRect(15, 6, 2, 11);
-        clockIconGraphics.fillRect(15, 15, 10, 2);
-        clockIconGraphics.generateTexture('icon_clock', 32, 32);
-        clockIconGraphics.destroy();
+        if (!this.textures.exists('icon_clock')) {
+            const clockIconGraphics = this.make.graphics();
+            clockIconGraphics.fillStyle(0xedf2f7);
+            clockIconGraphics.fillCircle(16, 16, 14);
+            clockIconGraphics.fillStyle(0x2d3748);
+            clockIconGraphics.fillRect(15, 6, 2, 11);
+            clockIconGraphics.fillRect(15, 15, 10, 2);
+            clockIconGraphics.generateTexture('icon_clock', 32, 32);
+            clockIconGraphics.destroy();
+        }
         
-        const skullIconGraphics = this.make.graphics();
-        skullIconGraphics.fillStyle(0xedf2f7);
-        skullIconGraphics.fillEllipse(16, 14, 24, 20);
-        skullIconGraphics.fillStyle(0x2d3748);
-        skullIconGraphics.fillCircle(11, 12, 4);
-        skullIconGraphics.fillCircle(21, 12, 4);
-        skullIconGraphics.fillTriangle(16, 18, 14, 22, 18, 22);
-        skullIconGraphics.fillRect(12, 26, 2, 4);
-        skullIconGraphics.fillRect(18, 26, 2, 4);
-        skullIconGraphics.generateTexture('icon_skull', 32, 32);
-        skullIconGraphics.destroy();
+        if (!this.textures.exists('icon_skull')) {
+            const skullIconGraphics = this.make.graphics();
+            skullIconGraphics.fillStyle(0xedf2f7);
+            skullIconGraphics.fillEllipse(16, 14, 24, 20);
+            skullIconGraphics.fillStyle(0x2d3748);
+            skullIconGraphics.fillCircle(11, 12, 4);
+            skullIconGraphics.fillCircle(21, 12, 4);
+            skullIconGraphics.fillTriangle(16, 18, 14, 22, 18, 22);
+            skullIconGraphics.fillRect(12, 26, 2, 4);
+            skullIconGraphics.fillRect(18, 26, 2, 4);
+            skullIconGraphics.generateTexture('icon_skull', 32, 32);
+            skullIconGraphics.destroy();
+        }
         
         // Lock Icon (moved here to be globally available)
-        const lockGraphics = this.make.graphics();
-        lockGraphics.fillStyle(0x4a5568); // dark grey
-        lockGraphics.fillRoundedRect(8, 12, 16, 14, 4); // body
-        lockGraphics.lineStyle(4, 0x718096); // light grey
-        lockGraphics.beginPath();
-        lockGraphics.arc(16, 12, 8, Phaser.Math.DegToRad(180), Phaser.Math.DegToRad(360));
-        lockGraphics.strokePath();
-        lockGraphics.generateTexture('lock_icon', 32, 32);
-        lockGraphics.destroy();
+        if (!this.textures.exists('lock_icon')) {
+            const lockGraphics = this.make.graphics();
+            lockGraphics.fillStyle(0x4a5568); // dark grey
+            lockGraphics.fillRoundedRect(8, 12, 16, 14, 4); // body
+            lockGraphics.lineStyle(4, 0x718096); // light grey
+            lockGraphics.beginPath();
+            lockGraphics.arc(16, 12, 8, Phaser.Math.DegToRad(180), Phaser.Math.DegToRad(360));
+            lockGraphics.strokePath();
+            lockGraphics.generateTexture('lock_icon', 32, 32);
+            lockGraphics.destroy();
+        }
         
         // Star Icons
-        const starGraphics = this.make.graphics();
-        const starPoints = (x: number, y: number, radius: number) => {
-            const points = [];
-            for (let i = 0; i < 10; i++) {
-                const r = i % 2 === 0 ? radius : radius / 2;
-                const angle = (i / 10) * Math.PI * 2 - Math.PI / 2;
-                points.push({
-                    x: x + r * Math.cos(angle),
-                    y: y + r * Math.sin(angle),
-                });
-            }
-            return points;
-        };
-        
-        // Filled star
-        starGraphics.fillStyle(0xf6e05e); // gold
-        starGraphics.fillPoints(starPoints(16, 16, 14), true);
-        starGraphics.generateTexture('star_filled', 32, 32);
-        starGraphics.clear();
+        if (!this.textures.exists('star_filled')) {
+            const starGraphics = this.make.graphics();
+            const starPoints = (x: number, y: number, radius: number) => {
+                const points = [];
+                for (let i = 0; i < 10; i++) {
+                    const r = i % 2 === 0 ? radius : radius / 2;
+                    const angle = (i / 10) * Math.PI * 2 - Math.PI / 2;
+                    points.push({
+                        x: x + r * Math.cos(angle),
+                        y: y + r * Math.sin(angle),
+                    });
+                }
+                return points;
+            };
+            
+            // Filled star
+            starGraphics.fillStyle(0xf6e05e); // gold
+            starGraphics.fillPoints(starPoints(16, 16, 14), true);
+            starGraphics.generateTexture('star_filled', 32, 32);
+            starGraphics.clear();
 
-        // Empty star
-        starGraphics.lineStyle(2, 0xa0aec0); // grey
-        starGraphics.strokePoints(starPoints(16, 16, 14), true);
-        starGraphics.generateTexture('star_empty', 32, 32);
-        starGraphics.destroy();
+            // Empty star
+            starGraphics.lineStyle(2, 0xa0aec0); // grey
+            starGraphics.strokePoints(starPoints(16, 16, 14), true);
+            starGraphics.generateTexture('star_empty', 32, 32);
+            starGraphics.destroy();
+        }
 
         // Procedurally generate music if it doesn't exist
         if (!this.sound.get('background_music')) {
@@ -289,6 +400,7 @@ class MainMenuScene extends Phaser.Scene {
         this.cameras.main.fadeIn(250, 0, 0, 0);
         this.add.image(0, 0, 'background').setOrigin(0);
         this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 200, 'Ultimate Level Challenge', {
+// FIX: The fontSize property in Phaser text styles expects a number, not a string. Changed to a numeric value.
             fontSize: 64,
             color: '#f7fafc',
             fontStyle: 'bold',
@@ -306,12 +418,14 @@ class MainMenuScene extends Phaser.Scene {
         const isCompleted = lastCompletion === today;
 
         this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 80, 'Daily Challenge:', {
+// FIX: The fontSize property in Phaser text styles expects a number, not a string. Changed to a numeric value.
             fontSize: 32,
             color: '#2d3748',
             fontStyle: 'bold'
         }).setOrigin(0.5);
         
         this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 30, todayChallenge.description, {
+// FIX: The fontSize property in Phaser text styles expects a number, not a string. Changed to a numeric value.
             fontSize: 28,
             color: '#1a202c',
             fontStyle: 'bold'
@@ -319,6 +433,7 @@ class MainMenuScene extends Phaser.Scene {
 
         if (isCompleted) {
              this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 10, '(Completed)', {
+// FIX: The fontSize property in Phaser text styles expects a number, not a string. Changed to a numeric value.
                 fontSize: 24,
                 color: '#38a169',
                 fontStyle: 'bold'
@@ -326,6 +441,7 @@ class MainMenuScene extends Phaser.Scene {
         }
 
         const startButton = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 100, 'Start Game', {
+// FIX: The fontSize property in Phaser text styles expects a number, not a string. Changed to a numeric value.
             fontSize: 32,
             color: '#f7fafc',
             fontStyle: 'bold',
@@ -344,6 +460,7 @@ class MainMenuScene extends Phaser.Scene {
         });
         
         const customizeButton = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 170, 'Customize', {
+// FIX: The fontSize property in Phaser text styles expects a number, not a string. Changed to a numeric value.
             fontSize: 32,
             color: '#f7fafc',
             fontStyle: 'bold',
@@ -387,6 +504,7 @@ class CustomizationScene extends Phaser.Scene {
         this.currentSelection = { ...this.cosmeticsData.equipped };
 
         this.add.text(GAME_WIDTH / 2, 80, 'Customize Your Explorer', {
+// FIX: The fontSize property in Phaser text styles expects a number, not a string. Changed to a numeric value.
             fontSize: 64,
             color: '#f7fafc',
             fontStyle: 'bold',
@@ -395,6 +513,7 @@ class CustomizationScene extends Phaser.Scene {
         }).setOrigin(0.5);
 
         // Preview Area
+// FIX: The fontSize property in Phaser text styles expects a number, not a string. Changed to a numeric value.
         this.add.text(320, 180, 'Preview', { fontSize: 48, color: '#2d3748', fontStyle: 'bold' }).setOrigin(0.5);
         const previewBg = this.add.graphics();
         previewBg.fillStyle(0xedf2f7, 0.5);
@@ -412,6 +531,7 @@ class CustomizationScene extends Phaser.Scene {
 
         // Save Button
         const saveButton = this.add.text(GAME_WIDTH - 150, GAME_HEIGHT - 70, 'Save & Exit', {
+// FIX: The fontSize property in Phaser text styles expects a number, not a string. Changed to a numeric value.
              fontSize: 32, color: '#f7fafc', fontStyle: 'bold', backgroundColor: '#38a169', padding: {x: 15, y: 10}
         }).setOrigin(0.5).setInteractive();
 
@@ -429,6 +549,7 @@ class CustomizationScene extends Phaser.Scene {
         
         // Tooltip for locked items
         this.tooltip = this.add.text(0, 0, '', {
+// FIX: The fontSize property in Phaser text styles expects a number, not a string. Changed to a numeric value.
             fontSize: 18,
             color: '#f7fafc',
             backgroundColor: 'rgba(45, 55, 72, 0.9)',
@@ -441,6 +562,7 @@ class CustomizationScene extends Phaser.Scene {
     }
     
     createSelectionList(title: string, items: any[], x: number, y: number) {
+// FIX: The fontSize property in Phaser text styles expects a number, not a string. Changed to a numeric value.
         this.add.text(x, y - 20, title, { fontSize: 32, color: '#2d3748', fontStyle: 'bold' });
 
         const itemsPerRow = 5;
@@ -473,6 +595,7 @@ class CustomizationScene extends Phaser.Scene {
                 const hatIcon = this.add.image(0, 0, item.texture).setScale(2);
                 container.add(hatIcon);
             } else {
+// FIX: The fontSize property in Phaser text styles expects a number, not a string. Changed to a numeric value.
                  const noHatText = this.add.text(0, 0, 'None', { fontSize: 20, color: '#2d3748' }).setOrigin(0.5);
                  container.add(noHatText);
             }
@@ -542,14 +665,16 @@ class LevelSelectScene extends Phaser.Scene {
 
     public dailyChallenge: any;
     private isChallengeCompleted = false;
+    private currentScore = 0;
     
     constructor() {
         super({ key: 'LevelSelectScene' });
     }
 
-    init(data: { challenge: any; isCompleted: boolean; }) {
+    init(data: { challenge: any; isCompleted: boolean; currentScore?: number }) {
         this.dailyChallenge = data.challenge;
         this.isChallengeCompleted = data.isCompleted;
+        this.currentScore = data.currentScore || 0;
     }
 
     preload() {
@@ -561,6 +686,7 @@ class LevelSelectScene extends Phaser.Scene {
         this.add.image(0, 0, 'background').setOrigin(0);
 
         this.add.text(GAME_WIDTH / 2, 80, 'Select Level', {
+// FIX: The fontSize property in Phaser text styles expects a number, not a string. Changed to a numeric value.
             fontSize: 64,
             color: '#f7fafc',
             fontStyle: 'bold',
@@ -575,6 +701,7 @@ class LevelSelectScene extends Phaser.Scene {
         });
 
         this.add.text(GAME_WIDTH - 40, 60, `${totalStars} ★`, {
+// FIX: The fontSize property in Phaser text styles expects a number, not a string. Changed to a numeric value.
             fontSize: 48, color: '#f6e05e', fontStyle: 'bold', stroke: '#2d3748', strokeThickness: 6
         }).setOrigin(1, 0.5);
         
@@ -607,6 +734,7 @@ class LevelSelectScene extends Phaser.Scene {
             buttonContainer.add(buttonBg);
             
             const levelText = this.add.text(0, -10, `${index + 1}`, {
+// FIX: The fontSize property in Phaser text styles expects a number, not a string. Changed to a numeric value.
                 fontSize: 50,
                 color: '#f7fafc',
                 fontStyle: 'bold'
@@ -614,6 +742,7 @@ class LevelSelectScene extends Phaser.Scene {
 
             if (isBossLevel) {
                  levelText.setText('B');
+// FIX: The fontSize property in Phaser text styles expects a number, not a string. Changed to a numeric value.
                  levelText.setFontSize(60);
             }
             buttonContainer.add(levelText);
@@ -623,6 +752,7 @@ class LevelSelectScene extends Phaser.Scene {
                 buttonContainer.add(lockIcon);
                 levelText.setAlpha(0.3);
 
+// FIX: The fontSize property in Phaser text styles expects a number, not a string. Changed to a numeric value.
                 const requiredText = this.add.text(0, 35, `${starsRequired} ★`, { fontSize: 24, color: '#f7fafc' }).setOrigin(0.5);
                 buttonContainer.add(requiredText);
             } else {
@@ -658,7 +788,7 @@ class LevelSelectScene extends Phaser.Scene {
                                 challenge: this.dailyChallenge,
                                 isCompleted: this.isChallengeCompleted,
                                 levelIndex: index,
-                                score: 0
+                                score: this.currentScore
                             });
                             this.scene.launch('UIScene', {
                                 challenge: this.dailyChallenge,
@@ -673,6 +803,7 @@ class LevelSelectScene extends Phaser.Scene {
 
         // Back button
         const backButton = this.add.text(100, GAME_HEIGHT - 70, '< Back', {
+// FIX: The fontSize property in Phaser text styles expects a number, not a string. Changed to a numeric value.
             fontSize: 48,
             color: '#f7fafc',
             fontStyle: 'bold',
@@ -705,6 +836,7 @@ class GameScene extends Phaser.Scene {
     tweens!: Phaser.Tweens.TweenManager;
     // FIX: The sound manager type was incorrect, causing assignment errors. Changed to WebAudioSoundManager.
     sound!: Phaser.Sound.WebAudioSoundManager;
+    textures!: Phaser.Textures.TextureManager;
 
     private player!: Phaser.Physics.Arcade.Sprite;
     private playerHat?: Phaser.GameObjects.Sprite;
@@ -842,477 +974,451 @@ class GameScene extends Phaser.Scene {
         }
     }
 
-    private drawPlayerFrame(key: string, drawCallback: (g: Phaser.GameObjects.Graphics) => void) {
-        const g = this.make.graphics({x: 0, y: 0});
-        drawCallback(g);
-        g.generateTexture(key, 64, 68);
-        g.destroy();
-    }
-
     preload() {
-        // Player animation frames
-        const drawBody = (g: Phaser.GameObjects.Graphics) => {
-            g.fillStyle(0x8b5a2b); // Torso/Arms base color
-            g.fillRect(22, 24, 20, 16);
-            g.fillStyle(0xffd3a9); // Head
-            g.fillRect(24, 8, 16, 16);
-            g.fillStyle(0x4a5568); // Shorts
-            g.fillRect(20, 40, 24, 18);
-        };
-
-        this.drawPlayerFrame('avatar_idle', g => {
-            drawBody(g);
-            g.fillStyle(0x5a3a22); // Boots
-            g.fillRect(22, 58, 8, 10);
-            g.fillRect(34, 58, 8, 10);
-        });
-
-        this.drawPlayerFrame('avatar_run_1', g => {
-            drawBody(g);
-            g.fillStyle(0x5a3a22); // Boots
-            g.fillRect(16, 58, 8, 10); // Back leg
-            g.fillRect(40, 58, 8, 10); // Front leg
-        });
-        
-        this.drawPlayerFrame('avatar_run_2', g => {
-            drawBody(g);
-            g.fillStyle(0x5a3a22); // Boots
-            g.fillRect(40, 58, 8, 10); // Back leg
-            g.fillRect(16, 58, 8, 10); // Front leg
-        });
-
-        this.drawPlayerFrame('avatar_jump', g => {
-            drawBody(g);
-            g.fillStyle(0x5a3a22); // Boots
-            g.fillRect(22, 52, 8, 8); // Tucked legs
-            g.fillRect(34, 52, 8, 8);
-        });
-
-        this.drawPlayerFrame('avatar_hurt', g => {
-            drawBody(g);
-            g.fillStyle(0x5a3a22); // Boots
-            g.fillRect(22, 58, 8, 10);
-            g.fillRect(34, 58, 8, 10);
-            // Add 'X' eyes for hurt state
-            g.lineStyle(2, 0x000000);
-            g.beginPath();
-            // Left eye
-            g.moveTo(26, 12); g.lineTo(30, 16);
-            g.moveTo(30, 12); g.lineTo(26, 16);
-            // Right eye
-            g.moveTo(34, 12); g.lineTo(38, 16);
-            g.moveTo(38, 12); g.lineTo(34, 16);
-            g.strokePath();
-        });
-
-        this.drawPlayerFrame('avatar_climb', g => {
-            drawBody(g);
-            g.fillStyle(0x8b5a2b); // Raised arms
-            g.fillRect(18, 16, 8, 8);
-            g.fillRect(38, 16, 8, 8);
-            g.fillStyle(0x5a3a22); // Boots
-            g.fillRect(22, 58, 8, 10);
-            g.fillRect(34, 58, 8, 10);
-        });
-
-
         // Platform - Mossy rock/wood
-        const platformGraphics = this.make.graphics();
-        platformGraphics.fillStyle(0x6b4a2b);
-        platformGraphics.fillRect(0, 0, 200, 32);
-        platformGraphics.fillStyle(0x48bb78, 0.7);
-        platformGraphics.fillRect(0, 0, 200, 8);
-        platformGraphics.fillRect(30, 8, 50, 5);
-        platformGraphics.fillRect(120, 8, 40, 5);
-        platformGraphics.generateTexture('platform', 200, 32);
-        platformGraphics.destroy();
+        if (!this.textures.exists('platform')) {
+            const platformGraphics = this.make.graphics();
+            platformGraphics.fillStyle(0x6b4a2b);
+            platformGraphics.fillRect(0, 0, 200, 32);
+            platformGraphics.fillStyle(0x48bb78, 0.7);
+            platformGraphics.fillRect(0, 0, 200, 8);
+            platformGraphics.fillRect(30, 8, 50, 5);
+            platformGraphics.fillRect(120, 8, 40, 5);
+            platformGraphics.generateTexture('platform', 200, 32);
+            platformGraphics.destroy();
+        }
         
         // Moving Platform
-        const movingPlatformGraphics = this.make.graphics();
-        movingPlatformGraphics.fillStyle(0x8b5a2b); // Base color
-        movingPlatformGraphics.fillRect(0, 0, 200, 32);
-        movingPlatformGraphics.fillStyle(0xf6e05e, 0.8); // Add gold accents
-        movingPlatformGraphics.fillCircle(15, 16, 8);
-        movingPlatformGraphics.fillCircle(185, 16, 8);
-        movingPlatformGraphics.fillRect(15, 14, 170, 4);
-        movingPlatformGraphics.generateTexture('moving_platform', 200, 32);
-        movingPlatformGraphics.destroy();
-
-        // Coin - Banana
-        const coinGraphics = this.make.graphics();
-        coinGraphics.fillStyle(0xf6e05e);
-        coinGraphics.beginPath();
-        // Draw a crescent/banana shape using two arcs
-        coinGraphics.arc(16, 30, 14, Phaser.Math.DegToRad(180), Phaser.Math.DegToRad(360), false);
-        coinGraphics.arc(16, 25, 12, Phaser.Math.DegToRad(0), Phaser.Math.DegToRad(180), true);
-        coinGraphics.closePath();
-        coinGraphics.fillPath();
-        // Add a small brown stem
-        coinGraphics.fillStyle(0x6b4a2b);
-        coinGraphics.fillRect(27, 16, 3, 5);
-        coinGraphics.generateTexture('coin', 32, 32);
-        coinGraphics.destroy();
-        
-        // Trap - Spikes
-        const trapGraphics = this.make.graphics();
-        trapGraphics.fillStyle(0x8b5a2b);
-        trapGraphics.beginPath();
-        trapGraphics.moveTo(0, 32);
-        for (let i = 0; i < 4; i++) {
-            trapGraphics.lineTo(i * 16 + 8, 0);
-            trapGraphics.lineTo((i + 1) * 16, 32);
+        if (!this.textures.exists('moving_platform')) {
+            const movingPlatformGraphics = this.make.graphics();
+            movingPlatformGraphics.fillStyle(0x8b5a2b); // Base color
+            movingPlatformGraphics.fillRect(0, 0, 200, 32);
+            movingPlatformGraphics.fillStyle(0xf6e05e, 0.8); // Add gold accents
+            movingPlatformGraphics.fillCircle(15, 16, 8);
+            movingPlatformGraphics.fillCircle(185, 16, 8);
+            movingPlatformGraphics.fillRect(15, 14, 170, 4);
+            movingPlatformGraphics.generateTexture('moving_platform', 200, 32);
+            movingPlatformGraphics.destroy();
         }
-        trapGraphics.closePath();
-        trapGraphics.fillPath();
-        trapGraphics.generateTexture('trap', 64, 32);
-        trapGraphics.destroy();
+
+        // Trap - Spikes
+        if (!this.textures.exists('trap')) {
+            const trapGraphics = this.make.graphics();
+            trapGraphics.fillStyle(0x8b5a2b);
+            trapGraphics.beginPath();
+            trapGraphics.moveTo(0, 32);
+            for (let i = 0; i < 4; i++) {
+                trapGraphics.lineTo(i * 16 + 8, 0);
+                trapGraphics.lineTo((i + 1) * 16, 32);
+            }
+            trapGraphics.closePath();
+            trapGraphics.fillPath();
+            trapGraphics.generateTexture('trap', 64, 32);
+            trapGraphics.destroy();
+        }
         
         // Goal - Temple Door
-        const goalGraphics = this.make.graphics();
-        goalGraphics.fillStyle(0x718096);
-        goalGraphics.fillRect(0, 0, 64, 128);
-        goalGraphics.fillStyle(0x2d3748);
-        goalGraphics.fillRect(12, 20, 40, 108);
-        goalGraphics.fillStyle(0xa0aec0);
-        goalGraphics.fillRect(8, 12, 48, 8);
-        goalGraphics.generateTexture('goal', 64, 128);
-        goalGraphics.destroy();
+        if (!this.textures.exists('goal')) {
+            const goalGraphics = this.make.graphics();
+            goalGraphics.fillStyle(0x718096);
+            goalGraphics.fillRect(0, 0, 64, 128);
+            goalGraphics.fillStyle(0x2d3748);
+            goalGraphics.fillRect(12, 20, 40, 108);
+            goalGraphics.fillStyle(0xa0aec0);
+            goalGraphics.fillRect(8, 12, 48, 8);
+            goalGraphics.generateTexture('goal', 64, 128);
+            goalGraphics.destroy();
+        }
         
         // Enemy - Snake
-        const enemyGraphics = this.make.graphics();
-        enemyGraphics.fillStyle(0x48bb78);
-        enemyGraphics.fillEllipse(24, 24, 40, 16);
-        enemyGraphics.fillStyle(0x000000);
-        enemyGraphics.fillCircle(12, 20, 3);
-        // Forked tongue - using a filled polygon for stability
-        enemyGraphics.fillStyle(0xf56565);
-        enemyGraphics.beginPath();
-        enemyGraphics.moveTo(8, 24); // base of tongue
-        enemyGraphics.lineTo(2, 21); // top fork tip
-        enemyGraphics.lineTo(4, 24); // inner point
-        enemyGraphics.lineTo(2, 27); // bottom fork tip
-        enemyGraphics.closePath();
-        enemyGraphics.fillPath();
-        enemyGraphics.generateTexture('enemy', 48, 48);
-        enemyGraphics.destroy();
+        if (!this.textures.exists('enemy')) {
+            const enemyGraphics = this.make.graphics();
+            enemyGraphics.fillStyle(0x48bb78);
+            enemyGraphics.fillEllipse(24, 24, 40, 16);
+            enemyGraphics.fillStyle(0x000000);
+            enemyGraphics.fillCircle(12, 20, 3);
+            // Forked tongue - using a filled polygon for stability
+            enemyGraphics.fillStyle(0xf56565);
+            enemyGraphics.beginPath();
+            enemyGraphics.moveTo(8, 24); // base of tongue
+            enemyGraphics.lineTo(2, 21); // top fork tip
+            enemyGraphics.lineTo(4, 24); // inner point
+            enemyGraphics.lineTo(2, 27); // bottom fork tip
+            enemyGraphics.closePath();
+            enemyGraphics.fillPath();
+            enemyGraphics.generateTexture('enemy', 48, 48);
+            enemyGraphics.destroy();
+        }
 
         // Enemy - Bat
-        const batGraphics = this.make.graphics();
-        batGraphics.fillStyle(0x4a5568); // Dark grey body
-        batGraphics.fillEllipse(24, 24, 20, 12); // Body
+        if (!this.textures.exists('enemy_bat')) {
+            const batGraphics = this.make.graphics();
+            batGraphics.fillStyle(0x4a5568); // Dark grey body
+            batGraphics.fillEllipse(24, 24, 20, 12); // Body
 
-        // Create wings using paths, as Graphics object doesn't have quadraticBezierTo directly
-        const leftWing = new Phaser.Curves.Path();
-        leftWing.moveTo(15, 24);
-        leftWing.quadraticBezierTo(0, 10, 5, 5);
-        leftWing.quadraticBezierTo(15, 15, 24, 20);
-        leftWing.closePath();
-        batGraphics.fillPoints(leftWing.getPoints(), true);
+            // Create wings using paths, as Graphics object doesn't have quadraticBezierTo directly
+            const leftWing = new Phaser.Curves.Path();
+            leftWing.moveTo(15, 24);
+            leftWing.quadraticBezierTo(0, 10, 5, 5);
+            leftWing.quadraticBezierTo(15, 15, 24, 20);
+            leftWing.closePath();
+            batGraphics.fillPoints(leftWing.getPoints(), true);
 
-        const rightWing = new Phaser.Curves.Path();
-        rightWing.moveTo(33, 24);
-        rightWing.quadraticBezierTo(48, 10, 43, 5);
-        rightWing.quadraticBezierTo(33, 15, 24, 20);
-        rightWing.closePath();
-        batGraphics.fillPoints(rightWing.getPoints(), true);
-        
-        batGraphics.fillStyle(0xc53030); // Red eyes
-        batGraphics.fillCircle(20, 22, 2);
-        batGraphics.fillCircle(28, 22, 2);
-        batGraphics.generateTexture('enemy_bat', 48, 48);
-        batGraphics.destroy();
+            const rightWing = new Phaser.Curves.Path();
+            rightWing.moveTo(33, 24);
+            rightWing.quadraticBezierTo(48, 10, 43, 5);
+            rightWing.quadraticBezierTo(33, 15, 24, 20);
+            rightWing.closePath();
+            batGraphics.fillPoints(rightWing.getPoints(), true);
+            
+            batGraphics.fillStyle(0xc53030); // Red eyes
+            batGraphics.fillCircle(20, 22, 2);
+            batGraphics.fillCircle(28, 22, 2);
+            batGraphics.generateTexture('enemy_bat', 48, 48);
+            batGraphics.destroy();
+        }
         
         // NEW ENEMY: Flying Beetle
-        const beetleGraphics = this.make.graphics();
-        beetleGraphics.fillStyle(0x5a3a22); // Dark brown body
-        beetleGraphics.fillEllipse(24, 24, 30, 20);
-        beetleGraphics.fillStyle(0xa0aec0, 0.8); // Grey wings
-        beetleGraphics.fillEllipse(16, 16, 16, 10);
-        beetleGraphics.fillEllipse(32, 16, 16, 10);
-        beetleGraphics.fillStyle(0xc53030); // Red eye
-        beetleGraphics.fillCircle(14, 22, 3);
-        beetleGraphics.generateTexture('enemy_beetle', 48, 48);
-        beetleGraphics.destroy();
+        if (!this.textures.exists('enemy_beetle')) {
+            const beetleGraphics = this.make.graphics();
+            beetleGraphics.fillStyle(0x5a3a22); // Dark brown body
+            beetleGraphics.fillEllipse(24, 24, 30, 20);
+            beetleGraphics.fillStyle(0xa0aec0, 0.8); // Grey wings
+            beetleGraphics.fillEllipse(16, 16, 16, 10);
+            beetleGraphics.fillEllipse(32, 16, 16, 10);
+            beetleGraphics.fillStyle(0xc53030); // Red eye
+            beetleGraphics.fillCircle(14, 22, 3);
+            beetleGraphics.generateTexture('enemy_beetle', 48, 48);
+            beetleGraphics.destroy();
+        }
 
         // NEW ENEMY: Spitting Spider
-        const spiderGraphics = this.make.graphics();
-        spiderGraphics.fillStyle(0x2d3748); // Dark grey body
-        spiderGraphics.fillEllipse(24, 24, 24, 18); // body
-        spiderGraphics.lineStyle(4, 0x2d3748); // legs
-        spiderGraphics.beginPath();
-        // Top legs
-        spiderGraphics.moveTo(16, 18); spiderGraphics.lineTo(4, 8);
-        spiderGraphics.moveTo(18, 16); spiderGraphics.lineTo(8, 4);
-        spiderGraphics.moveTo(30, 16); spiderGraphics.lineTo(40, 4);
-        spiderGraphics.moveTo(32, 18); spiderGraphics.lineTo(44, 8);
-        // Bottom legs
-        spiderGraphics.moveTo(16, 30); spiderGraphics.lineTo(4, 40);
-        spiderGraphics.moveTo(18, 32); spiderGraphics.lineTo(8, 44);
-        spiderGraphics.moveTo(30, 32); spiderGraphics.lineTo(40, 44);
-        spiderGraphics.moveTo(32, 30); spiderGraphics.lineTo(44, 40);
-        spiderGraphics.strokePath();
-        spiderGraphics.fillStyle(0xc53030); // Red hourglass
-        spiderGraphics.fillTriangle(24, 22, 20, 28, 28, 28);
-        spiderGraphics.generateTexture('enemy_spider', 48, 48);
-        spiderGraphics.destroy();
+        if (!this.textures.exists('enemy_spider')) {
+            const spiderGraphics = this.make.graphics();
+            spiderGraphics.fillStyle(0x2d3748); // Dark grey body
+            spiderGraphics.fillEllipse(24, 24, 24, 18); // body
+            spiderGraphics.lineStyle(4, 0x2d3748); // legs
+            spiderGraphics.beginPath();
+            // Top legs
+            spiderGraphics.moveTo(16, 18); spiderGraphics.lineTo(4, 8);
+            spiderGraphics.moveTo(18, 16); spiderGraphics.lineTo(8, 4);
+            spiderGraphics.moveTo(30, 16); spiderGraphics.lineTo(40, 4);
+            spiderGraphics.moveTo(32, 18); spiderGraphics.lineTo(44, 8);
+            // Bottom legs
+            spiderGraphics.moveTo(16, 30); spiderGraphics.lineTo(4, 40);
+            spiderGraphics.moveTo(18, 32); spiderGraphics.lineTo(8, 44);
+            spiderGraphics.moveTo(30, 32); spiderGraphics.lineTo(40, 44);
+            spiderGraphics.moveTo(32, 30); spiderGraphics.lineTo(44, 40);
+            spiderGraphics.strokePath();
+            spiderGraphics.fillStyle(0xc53030); // Red hourglass
+            spiderGraphics.fillTriangle(24, 22, 20, 28, 28, 28);
+            spiderGraphics.generateTexture('enemy_spider', 48, 48);
+            spiderGraphics.destroy();
+        }
         
         // NEW: Spider Venom Projectile
-        const venomGraphics = this.make.graphics();
-        venomGraphics.fillStyle(0x48bb78); // Green
-        venomGraphics.fillCircle(8, 8, 6);
-        venomGraphics.fillStyle(0x38a169, 0.7); // Darker green highlight
-        venomGraphics.fillCircle(6, 6, 2);
-        venomGraphics.generateTexture('projectile_venom', 16, 16);
-        venomGraphics.destroy();
+        if (!this.textures.exists('projectile_venom')) {
+            const venomGraphics = this.make.graphics();
+            venomGraphics.fillStyle(0x48bb78); // Green
+            venomGraphics.fillCircle(8, 8, 6);
+            venomGraphics.fillStyle(0x38a169, 0.7); // Darker green highlight
+            venomGraphics.fillCircle(6, 6, 2);
+            venomGraphics.generateTexture('projectile_venom', 16, 16);
+            venomGraphics.destroy();
+        }
 
         // Enemy - Spiky Turtle
-        const turtleGraphics = this.make.graphics();
-        turtleGraphics.fillStyle(0x8b5a2b); // brown body
-        turtleGraphics.fillEllipse(24, 28, 40, 20); // body
-        turtleGraphics.fillStyle(0x2f855a); // dark green shell
-        turtleGraphics.fillEllipse(24, 22, 36, 24); // shell
-        turtleGraphics.fillStyle(0xf6e05e); // yellow spikes
-        turtleGraphics.fillTriangle(16, 12, 12, 2, 20, 2);
-        turtleGraphics.fillTriangle(24, 15, 20, 5, 28, 5);
-        turtleGraphics.fillTriangle(32, 12, 28, 2, 36, 2);
-        turtleGraphics.fillStyle(0x000000); // eye
-        turtleGraphics.fillCircle(10, 26, 2);
-        turtleGraphics.generateTexture('enemy_turtle', 48, 48);
-        turtleGraphics.destroy();
+        if (!this.textures.exists('enemy_turtle')) {
+            const turtleGraphics = this.make.graphics();
+            turtleGraphics.fillStyle(0x8b5a2b); // brown body
+            turtleGraphics.fillEllipse(24, 28, 40, 20); // body
+            turtleGraphics.fillStyle(0x2f855a); // dark green shell
+            turtleGraphics.fillEllipse(24, 22, 36, 24); // shell
+            turtleGraphics.fillStyle(0xf6e05e); // yellow spikes
+            turtleGraphics.fillTriangle(16, 12, 12, 2, 20, 2);
+            turtleGraphics.fillTriangle(24, 15, 20, 5, 28, 5);
+            turtleGraphics.fillTriangle(32, 12, 28, 2, 36, 2);
+            turtleGraphics.fillStyle(0x000000); // eye
+            turtleGraphics.fillCircle(10, 26, 2);
+            turtleGraphics.generateTexture('enemy_turtle', 48, 48);
+            turtleGraphics.destroy();
+        }
 
         // Boss - Jungle Gorilla
-        const bossGraphics = this.make.graphics();
-        bossGraphics.fillStyle(0x5a3a22); // Dark brown fur
-        bossGraphics.fillRoundedRect(10, 20, 108, 100, 20); // Body
-        bossGraphics.fillRoundedRect(30, 0, 68, 60, 15); // Head
-        bossGraphics.fillStyle(0x4a2b1b); // Darker brown for details
-        bossGraphics.fillEllipse(64, 110, 90, 30); // Chest
-        bossGraphics.fillStyle(0xffd3a9); // Face color
-        bossGraphics.fillEllipse(64, 35, 40, 25);
-        bossGraphics.fillStyle(0xc53030); // Red eyes
-        bossGraphics.fillCircle(54, 30, 5);
-        bossGraphics.fillCircle(74, 30, 5);
-        bossGraphics.generateTexture('boss_gorilla', 128, 128);
-        bossGraphics.destroy();
+        if (!this.textures.exists('boss_gorilla')) {
+            const bossGraphics = this.make.graphics();
+            bossGraphics.fillStyle(0x5a3a22); // Dark brown fur
+            bossGraphics.fillRoundedRect(10, 20, 108, 100, 20); // Body
+            bossGraphics.fillRoundedRect(30, 0, 68, 60, 15); // Head
+            bossGraphics.fillStyle(0x4a2b1b); // Darker brown for details
+            bossGraphics.fillEllipse(64, 110, 90, 30); // Chest
+            bossGraphics.fillStyle(0xffd3a9); // Face color
+            bossGraphics.fillEllipse(64, 35, 40, 25);
+            bossGraphics.fillStyle(0xc53030); // Red eyes
+            bossGraphics.fillCircle(54, 30, 5);
+            bossGraphics.fillCircle(74, 30, 5);
+            bossGraphics.generateTexture('boss_gorilla', 128, 128);
+            bossGraphics.destroy();
+        }
 
         // Projectile - Coconut
-        const projectileGraphics = this.make.graphics();
-        projectileGraphics.fillStyle(0x6b4a2b);
-        projectileGraphics.fillCircle(16, 16, 12);
-        projectileGraphics.fillStyle(0x4a2b1b);
-        projectileGraphics.fillCircle(12, 12, 3);
-        projectileGraphics.fillCircle(20, 12, 3);
-        projectileGraphics.generateTexture('projectile', 32, 32);
-        projectileGraphics.destroy();
+        if (!this.textures.exists('projectile')) {
+            const projectileGraphics = this.make.graphics();
+            projectileGraphics.fillStyle(0x6b4a2b);
+            projectileGraphics.fillCircle(16, 16, 12);
+            projectileGraphics.fillStyle(0x4a2b1b);
+            projectileGraphics.fillCircle(12, 12, 3);
+            projectileGraphics.fillCircle(20, 12, 3);
+            projectileGraphics.generateTexture('projectile', 32, 32);
+            projectileGraphics.destroy();
+        }
         
         // Homing Projectile - Banana-rang
-        const homingProjectileGraphics = this.make.graphics();
-        homingProjectileGraphics.fillStyle(0xf6e05e); // Banana yellow
-        const boomerangPath = new Phaser.Curves.Path(16, 0);
-        boomerangPath.cubicBezierTo(32, 0, 32, 32, 16, 32);
-        boomerangPath.cubicBezierTo(24, 32, 24, 8, 16, 0);
-        homingProjectileGraphics.fillPoints(boomerangPath.getPoints(), true);
-        homingProjectileGraphics.generateTexture('projectile_homing', 32, 32);
-        homingProjectileGraphics.destroy();
+        if (!this.textures.exists('projectile_homing')) {
+            const homingProjectileGraphics = this.make.graphics();
+            homingProjectileGraphics.fillStyle(0xf6e05e); // Banana yellow
+            const boomerangPath = new Phaser.Curves.Path(16, 0);
+            boomerangPath.cubicBezierTo(32, 0, 32, 32, 16, 32);
+            boomerangPath.cubicBezierTo(24, 32, 24, 8, 16, 0);
+            homingProjectileGraphics.fillPoints(boomerangPath.getPoints(), true);
+            homingProjectileGraphics.generateTexture('projectile_homing', 32, 32);
+            homingProjectileGraphics.destroy();
+        }
 
         // Boss Tell VFX
-        const sparkleGraphics = this.make.graphics();
-        sparkleGraphics.fillStyle(0xffffff);
-        sparkleGraphics.beginPath();
-        sparkleGraphics.moveTo(8, 0);
-        sparkleGraphics.lineTo(10, 6);
-        sparkleGraphics.lineTo(16, 8);
-        sparkleGraphics.lineTo(10, 10);
-        sparkleGraphics.lineTo(8, 16);
-        sparkleGraphics.lineTo(6, 10);
-        sparkleGraphics.lineTo(0, 8);
-        sparkleGraphics.lineTo(6, 6);
-        sparkleGraphics.closePath();
-        sparkleGraphics.fillPath();
-        sparkleGraphics.generateTexture('sparkle', 16, 16);
-        sparkleGraphics.destroy();
+        if (!this.textures.exists('sparkle')) {
+            const sparkleGraphics = this.make.graphics();
+            sparkleGraphics.fillStyle(0xffffff);
+            sparkleGraphics.beginPath();
+            sparkleGraphics.moveTo(8, 0);
+            sparkleGraphics.lineTo(10, 6);
+            sparkleGraphics.lineTo(16, 8);
+            sparkleGraphics.lineTo(10, 10);
+            sparkleGraphics.lineTo(8, 16);
+            sparkleGraphics.lineTo(6, 10);
+            sparkleGraphics.lineTo(0, 8);
+            sparkleGraphics.lineTo(6, 6);
+            sparkleGraphics.closePath();
+            sparkleGraphics.fillPath();
+            sparkleGraphics.generateTexture('sparkle', 16, 16);
+            sparkleGraphics.destroy();
+        }
 
         // Explosion Particle
-        const explosionParticleGraphics = this.make.graphics();
-        explosionParticleGraphics.fillStyle(0xf6e05e); // Yellow
-        explosionParticleGraphics.fillCircle(8, 8, 8);
-        explosionParticleGraphics.generateTexture('explosion_particle', 16, 16);
-        explosionParticleGraphics.destroy();
+        if (!this.textures.exists('explosion_particle')) {
+            const explosionParticleGraphics = this.make.graphics();
+            explosionParticleGraphics.fillStyle(0xf6e05e); // Yellow
+            explosionParticleGraphics.fillCircle(8, 8, 8);
+            explosionParticleGraphics.generateTexture('explosion_particle', 16, 16);
+            explosionParticleGraphics.destroy();
+        }
         
         // Parry/Stun Effects
-        const parryEffectGraphics = this.make.graphics();
-        parryEffectGraphics.lineStyle(4, 0x4299e1);
-        parryEffectGraphics.fillStyle(0x4299e1, 0.3);
-        parryEffectGraphics.beginPath();
-        parryEffectGraphics.moveTo(0, 0);
-        parryEffectGraphics.lineTo(32, 0);
-        parryEffectGraphics.lineTo(32, 32);
-        parryEffectGraphics.lineTo(16, 40);
-        parryEffectGraphics.lineTo(0, 32);
-        parryEffectGraphics.closePath();
-        parryEffectGraphics.fillPath();
-        parryEffectGraphics.strokePath();
-        parryEffectGraphics.generateTexture('parry_effect', 32, 40);
-        parryEffectGraphics.destroy();
+        if (!this.textures.exists('parry_effect')) {
+            const parryEffectGraphics = this.make.graphics();
+            parryEffectGraphics.lineStyle(4, 0x4299e1);
+            parryEffectGraphics.fillStyle(0x4299e1, 0.3);
+            parryEffectGraphics.beginPath();
+            parryEffectGraphics.moveTo(0, 0);
+            parryEffectGraphics.lineTo(32, 0);
+            parryEffectGraphics.lineTo(32, 32);
+            parryEffectGraphics.lineTo(16, 40);
+            parryEffectGraphics.lineTo(0, 32);
+            parryEffectGraphics.closePath();
+            parryEffectGraphics.fillPath();
+            parryEffectGraphics.strokePath();
+            parryEffectGraphics.generateTexture('parry_effect', 32, 40);
+            parryEffectGraphics.destroy();
+        }
 
-        const stunEffectGraphics = this.make.graphics();
-        stunEffectGraphics.fillStyle(0xf6e05e);
-        const drawStar = (x: number, y: number) => {
-            const spikes = 4;
-            const outerRadius = 8;
-            const innerRadius = 4;
-            const points = [];
-            const rot = Math.PI / 2 * 3;
-            const angleStep = Math.PI / spikes;
+        if (!this.textures.exists('stun_effect')) {
+            const stunEffectGraphics = this.make.graphics();
+            stunEffectGraphics.fillStyle(0xf6e05e);
+            const drawStar = (x: number, y: number) => {
+                const spikes = 4;
+                const outerRadius = 8;
+                const innerRadius = 4;
+                const points = [];
+                const rot = Math.PI / 2 * 3;
+                const angleStep = Math.PI / spikes;
 
-            for (let i = 0; i < spikes * 2; i++) {
-                const radius = (i % 2 === 0) ? outerRadius : innerRadius;
-                const angle = rot + i * angleStep;
-                points.push({
-                    x: x + radius * Math.cos(angle),
-                    y: y + radius * Math.sin(angle),
-                });
-            }
+                for (let i = 0; i < spikes * 2; i++) {
+                    const radius = (i % 2 === 0) ? outerRadius : innerRadius;
+                    const angle = rot + i * angleStep;
+                    points.push({
+                        x: x + radius * Math.cos(angle),
+                        y: y + radius * Math.sin(angle),
+                    });
+                }
 
-            stunEffectGraphics.beginPath();
-            stunEffectGraphics.moveTo(points[0].x, points[0].y);
-            for (let i = 1; i < points.length; i++) {
-                stunEffectGraphics.lineTo(points[i].x, points[i].y);
-            }
-            stunEffectGraphics.closePath();
-            stunEffectGraphics.fillPath();
-        };
-        drawStar(8, 16);
-        drawStar(24, 8);
-        drawStar(40, 16);
-        stunEffectGraphics.generateTexture('stun_effect', 48, 24);
-        stunEffectGraphics.destroy();
+                stunEffectGraphics.beginPath();
+                stunEffectGraphics.moveTo(points[0].x, points[0].y);
+                for (let i = 1; i < points.length; i++) {
+                    stunEffectGraphics.lineTo(points[i].x, points[i].y);
+                }
+                stunEffectGraphics.closePath();
+                stunEffectGraphics.fillPath();
+            };
+            drawStar(8, 16);
+            drawStar(24, 8);
+            drawStar(40, 16);
+            stunEffectGraphics.generateTexture('stun_effect', 48, 24);
+            stunEffectGraphics.destroy();
+        }
 
         // Power-ups
-        const speedGraphics = this.make.graphics();
-        speedGraphics.fillStyle(0x4299e1);
-        speedGraphics.fillRoundedRect(4, 8, 24, 16, 5);
-        speedGraphics.fillStyle(0xffffff);
-        speedGraphics.fillRoundedRect(8, 6, 18, 10, 4);
-        speedGraphics.generateTexture('speed_boost', 32, 32);
-        speedGraphics.destroy();
+        if (!this.textures.exists('speed_boost')) {
+            const speedGraphics = this.make.graphics();
+            speedGraphics.fillStyle(0x4299e1);
+            speedGraphics.fillRoundedRect(4, 8, 24, 16, 5);
+            speedGraphics.fillStyle(0xffffff);
+            speedGraphics.fillRoundedRect(8, 6, 18, 10, 4);
+            speedGraphics.generateTexture('speed_boost', 32, 32);
+            speedGraphics.destroy();
+        }
 
-        const shieldPowerupGraphics = this.make.graphics();
-        shieldPowerupGraphics.fillStyle(0x8b5a2b);
-        shieldPowerupGraphics.fillEllipse(16, 16, 28, 22);
-        shieldPowerupGraphics.lineStyle(2, 0x6b4a2b);
-        shieldPowerupGraphics.strokeEllipse(16, 16, 28, 22);
-        shieldPowerupGraphics.fillStyle(0x6b4a2b);
-        shieldPowerupGraphics.fillRect(4, 15, 24, 2);
-        shieldPowerupGraphics.generateTexture('shield_powerup', 32, 32);
-        shieldPowerupGraphics.destroy();
+        if (!this.textures.exists('shield_powerup')) {
+            const shieldPowerupGraphics = this.make.graphics();
+            shieldPowerupGraphics.fillStyle(0x8b5a2b);
+            shieldPowerupGraphics.fillEllipse(16, 16, 28, 22);
+            shieldPowerupGraphics.lineStyle(2, 0x6b4a2b);
+            shieldPowerupGraphics.strokeEllipse(16, 16, 28, 22);
+            shieldPowerupGraphics.fillStyle(0x6b4a2b);
+            shieldPowerupGraphics.fillRect(4, 15, 24, 2);
+            shieldPowerupGraphics.generateTexture('shield_powerup', 32, 32);
+            shieldPowerupGraphics.destroy();
+        }
 
-        const activeShieldGraphics = this.make.graphics();
-        activeShieldGraphics.fillStyle(0x9ae6b4, 0.4);
-        activeShieldGraphics.fillCircle(40, 40, 38);
-        activeShieldGraphics.lineStyle(2, 0x68d391);
-        activeShieldGraphics.strokeCircle(40, 40, 38);
-        activeShieldGraphics.generateTexture('shield_active', 80, 80);
-        activeShieldGraphics.destroy();
+        if (!this.textures.exists('shield_active')) {
+            const activeShieldGraphics = this.make.graphics();
+            activeShieldGraphics.fillStyle(0x9ae6b4, 0.4);
+            activeShieldGraphics.fillCircle(40, 40, 38);
+            activeShieldGraphics.lineStyle(2, 0x68d391);
+            activeShieldGraphics.strokeCircle(40, 40, 38);
+            activeShieldGraphics.generateTexture('shield_active', 80, 80);
+            activeShieldGraphics.destroy();
+        }
 
-        const jumpGraphics = this.make.graphics();
-        jumpGraphics.fillStyle(0x68d391);
-        jumpGraphics.fillEllipse(16, 18, 20, 14);
-        jumpGraphics.fillStyle(0xffffff);
-        jumpGraphics.fillCircle(12, 14, 5);
-        jumpGraphics.fillCircle(20, 14, 5);
-        jumpGraphics.fillStyle(0x000000);
-        jumpGraphics.fillCircle(12, 14, 2);
-        jumpGraphics.fillCircle(20, 14, 2);
-        jumpGraphics.generateTexture('jump_boost', 32, 32);
-        jumpGraphics.destroy();
+        if (!this.textures.exists('jump_boost')) {
+            const jumpGraphics = this.make.graphics();
+            jumpGraphics.fillStyle(0x68d391);
+            jumpGraphics.fillEllipse(16, 18, 20, 14);
+            jumpGraphics.fillStyle(0xffffff);
+            jumpGraphics.fillCircle(12, 14, 5);
+            jumpGraphics.fillCircle(20, 14, 5);
+            jumpGraphics.fillStyle(0x000000);
+            jumpGraphics.fillCircle(12, 14, 2);
+            jumpGraphics.fillCircle(20, 14, 2);
+            jumpGraphics.generateTexture('jump_boost', 32, 32);
+            jumpGraphics.destroy();
+        }
 
         // Hazards
-        const rockGraphics = this.make.graphics();
-        rockGraphics.fillStyle(0x718096);
-        rockGraphics.beginPath();
-        rockGraphics.moveTo(20, 0);
-        rockGraphics.lineTo(40, 10);
-        rockGraphics.lineTo(35, 35);
-        rockGraphics.lineTo(10, 40);
-        rockGraphics.lineTo(0, 20);
-        rockGraphics.closePath();
-        rockGraphics.fillPath();
-        rockGraphics.generateTexture('falling_rock', 40, 40);
-        rockGraphics.destroy();
-
-        const geyserHoleGraphics = this.make.graphics();
-        geyserHoleGraphics.fillStyle(0x6b4a2b);
-        geyserHoleGraphics.fillEllipse(24, 16, 48, 12);
-        geyserHoleGraphics.fillStyle(0x4a2b1b);
-        geyserHoleGraphics.fillEllipse(24, 14, 20, 8);
-        geyserHoleGraphics.generateTexture('geyser_hole', 48, 32);
-        geyserHoleGraphics.destroy();
-
-        const geyserJetGraphics = this.make.graphics();
-        geyserJetGraphics.fillStyle(0xedf2f7, 0.8);
-        geyserJetGraphics.fillRect(0, 0, 24, 150);
-        geyserJetGraphics.fillStyle(0xa0aec0, 0.6);
-        geyserJetGraphics.fillRect(4, 0, 16, 150);
-        geyserJetGraphics.generateTexture('geyser_jet', 24, 150);
-        geyserJetGraphics.destroy();
-        
-        const quicksandGraphics = this.make.graphics();
-        quicksandGraphics.fillStyle(0x6b4a2b);
-        quicksandGraphics.fillRect(0, 0, 100, 40);
-        quicksandGraphics.fillStyle(0x5a3a22, 0.8);
-        for(let i = 0; i < 3; i++) {
-             quicksandGraphics.fillEllipse(Phaser.Math.Between(10, 90), Phaser.Math.Between(5, 35), Phaser.Math.Between(10, 25), Phaser.Math.Between(5, 10));
+        if (!this.textures.exists('falling_rock')) {
+            const rockGraphics = this.make.graphics();
+            rockGraphics.fillStyle(0x718096);
+            rockGraphics.beginPath();
+            rockGraphics.moveTo(20, 0);
+            rockGraphics.lineTo(40, 10);
+            rockGraphics.lineTo(35, 35);
+            rockGraphics.lineTo(10, 40);
+            rockGraphics.lineTo(0, 20);
+            rockGraphics.closePath();
+            rockGraphics.fillPath();
+            rockGraphics.generateTexture('falling_rock', 40, 40);
+            rockGraphics.destroy();
         }
-        quicksandGraphics.generateTexture('quicksand', 100, 40);
-        quicksandGraphics.destroy();
+
+        if (!this.textures.exists('geyser_hole')) {
+            const geyserHoleGraphics = this.make.graphics();
+            geyserHoleGraphics.fillStyle(0x6b4a2b);
+            geyserHoleGraphics.fillEllipse(24, 16, 48, 12);
+            geyserHoleGraphics.fillStyle(0x4a2b1b);
+            geyserHoleGraphics.fillEllipse(24, 14, 20, 8);
+            geyserHoleGraphics.generateTexture('geyser_hole', 48, 32);
+            geyserHoleGraphics.destroy();
+        }
+
+        if (!this.textures.exists('geyser_jet')) {
+            const geyserJetGraphics = this.make.graphics();
+            geyserJetGraphics.fillStyle(0xedf2f7, 0.8);
+            geyserJetGraphics.fillRect(0, 0, 24, 150);
+            geyserJetGraphics.fillStyle(0xa0aec0, 0.6);
+            geyserJetGraphics.fillRect(4, 0, 16, 150);
+            geyserJetGraphics.generateTexture('geyser_jet', 24, 150);
+            geyserJetGraphics.destroy();
+        }
+        
+        if (!this.textures.exists('quicksand')) {
+            const quicksandGraphics = this.make.graphics();
+            quicksandGraphics.fillStyle(0x6b4a2b);
+            quicksandGraphics.fillRect(0, 0, 100, 40);
+            quicksandGraphics.fillStyle(0x5a3a22, 0.8);
+            for(let i = 0; i < 3; i++) {
+                 quicksandGraphics.fillEllipse(Phaser.Math.Between(10, 90), Phaser.Math.Between(5, 35), Phaser.Math.Between(10, 25), Phaser.Math.Between(5, 10));
+            }
+            quicksandGraphics.generateTexture('quicksand', 100, 40);
+            quicksandGraphics.destroy();
+        }
         
         // Visual Effects
-        const vineGraphics = this.make.graphics();
-        vineGraphics.lineStyle(8, 0x2f855a);
-        const vinePath = new Phaser.Curves.Path(10, 0);
-        vinePath.quadraticBezierTo(20, 50, 10, 100);
-        vinePath.quadraticBezierTo(0, 150, 10, 200);
-        vinePath.draw(vineGraphics);
-        vineGraphics.generateTexture('vine', 20, 200);
-        vineGraphics.destroy();
+        if (!this.textures.exists('vine')) {
+            const vineGraphics = this.make.graphics();
+            vineGraphics.lineStyle(8, 0x2f855a);
+            const vinePath = new Phaser.Curves.Path(10, 0);
+            vinePath.quadraticBezierTo(20, 50, 10, 100);
+            vinePath.quadraticBezierTo(0, 150, 10, 200);
+            vinePath.draw(vineGraphics);
+            vineGraphics.generateTexture('vine', 20, 200);
+            vineGraphics.destroy();
+        }
 
-        const dripGraphics = this.make.graphics();
-        dripGraphics.fillStyle(0x4299e1);
-        dripGraphics.fillEllipse(4, 8, 8, 16);
-        dripGraphics.generateTexture('drip', 16, 24);
-        dripGraphics.destroy();
+        if (!this.textures.exists('drip')) {
+            const dripGraphics = this.make.graphics();
+            dripGraphics.fillStyle(0x4299e1);
+            dripGraphics.fillEllipse(4, 8, 8, 16);
+            dripGraphics.generateTexture('drip', 16, 24);
+            dripGraphics.destroy();
+        }
 
-        const splashGraphics = this.make.graphics();
-        splashGraphics.lineStyle(2, 0x4299e1, 0.8);
-        splashGraphics.strokeCircle(16, 16, 6);
-        splashGraphics.strokeCircle(16, 16, 12);
-        splashGraphics.generateTexture('splash', 32, 32);
-        splashGraphics.destroy();
+        if (!this.textures.exists('splash')) {
+            const splashGraphics = this.make.graphics();
+            splashGraphics.lineStyle(2, 0x4299e1, 0.8);
+            splashGraphics.strokeCircle(16, 16, 6);
+            splashGraphics.strokeCircle(16, 16, 12);
+            splashGraphics.generateTexture('splash', 32, 32);
+            splashGraphics.destroy();
+        }
         
         // NEW: VFX Particles
-        const blueParticle = this.make.graphics();
-        blueParticle.fillStyle(0x4299e1);
-        blueParticle.fillCircle(4, 4, 4);
-        blueParticle.generateTexture('particle_blue', 8, 8);
-        blueParticle.destroy();
+        if (!this.textures.exists('particle_blue')) {
+            const blueParticle = this.make.graphics();
+            blueParticle.fillStyle(0x4299e1);
+            blueParticle.fillCircle(4, 4, 4);
+            blueParticle.generateTexture('particle_blue', 8, 8);
+            blueParticle.destroy();
+        }
 
-        const smokeParticle = this.make.graphics();
-        smokeParticle.fillStyle(0xa0aec0, 0.7);
-        smokeParticle.fillCircle(8, 8, 8);
-        smokeParticle.generateTexture('particle_smoke', 16, 16);
-        smokeParticle.destroy();
+        if (!this.textures.exists('particle_smoke')) {
+            const smokeParticle = this.make.graphics();
+            smokeParticle.fillStyle(0xa0aec0, 0.7);
+            smokeParticle.fillCircle(8, 8, 8);
+            smokeParticle.generateTexture('particle_smoke', 16, 16);
+            smokeParticle.destroy();
+        }
 
         // FIX: Changed particle to white so it can be tinted dynamically for different collection effects.
-        const goldParticle = this.make.graphics();
-        goldParticle.fillStyle(0xffffff);
-        goldParticle.beginPath();
-        goldParticle.moveTo(4, 0); goldParticle.lineTo(5, 3); goldParticle.lineTo(8, 4); goldParticle.lineTo(5, 5);
-        goldParticle.lineTo(4, 8); goldParticle.lineTo(3, 5); goldParticle.lineTo(0, 4); goldParticle.lineTo(3, 3);
-        goldParticle.closePath();
-        goldParticle.fillPath();
-        goldParticle.generateTexture('particle_gold', 8, 8);
-        goldParticle.destroy();
+        if (!this.textures.exists('particle_gold')) {
+            const goldParticle = this.make.graphics();
+            goldParticle.fillStyle(0xffffff);
+            goldParticle.beginPath();
+            goldParticle.moveTo(4, 0); goldParticle.lineTo(5, 3); goldParticle.lineTo(8, 4); goldParticle.lineTo(5, 5);
+            goldParticle.lineTo(4, 8); goldParticle.lineTo(3, 5); goldParticle.lineTo(0, 4); goldParticle.lineTo(3, 3);
+            goldParticle.closePath();
+            goldParticle.fillPath();
+            goldParticle.generateTexture('particle_gold', 8, 8);
+            goldParticle.destroy();
+        }
     }
 
     create() {
@@ -2452,8 +2558,7 @@ class GameScene extends Phaser.Scene {
     
     showUnlockMessage(message: string) {
         const unlockText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 150, message, {
-            // FIX: The fontSize property must be a number, not a string.
-// FIX: Changed fontSize to a number to match type definitions.
+// FIX: The fontSize property in Phaser text styles expects a number, not a string. Changed to a numeric value.
             fontSize: 48,
             color: '#4299e1',
             fontStyle: 'bold',
@@ -2507,8 +2612,7 @@ class GameScene extends Phaser.Scene {
             }
 
             this.challengeCompleteText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 100, 'Challenge Complete!', {
-                // FIX: The fontSize property must be a number, not a string.
-// FIX: Changed fontSize to a number to match type definitions.
+// FIX: The fontSize property in Phaser text styles expects a number, not a string. Changed to a numeric value.
                 fontSize: 48,
                 color: '#48bb78',
                 fontStyle: 'bold',
@@ -2596,8 +2700,7 @@ class GameScene extends Phaser.Scene {
         localStorage.setItem('ultimateLevelChallenge_shownTutorials', JSON.stringify(Array.from(this.shownTutorials)));
 
         const hintText = this.add.text(GAME_WIDTH / 2, 100, text, {
-            // FIX: The fontSize property must be a number, not a string.
-// FIX: Changed fontSize to a number to match type definitions.
+// FIX: The fontSize property in Phaser text styles expects a number, not a string. Changed to a numeric value.
             fontSize: 32,
             color: '#f7fafc',
             fontStyle: 'bold',
@@ -2623,8 +2726,7 @@ class GameScene extends Phaser.Scene {
         this.physics.pause();
 
         const bossName = this.add.text(this.boss.x, this.boss.y - 120, 'JUNGLE KING', {
-            // FIX: The fontSize property must be a number, not a string.
-// FIX: Changed fontSize to a number to match type definitions.
+// FIX: The fontSize property in Phaser text styles expects a number, not a string. Changed to a numeric value.
             fontSize: 48,
             color: '#f7fafc',
             fontStyle: 'bold',
@@ -2633,8 +2735,7 @@ class GameScene extends Phaser.Scene {
         }).setOrigin(0.5).setAlpha(0).setDepth(100);
 
         const fightText = this.add.text(this.cameras.main.centerX, this.cameras.main.centerY, 'FIGHT!', {
-            // FIX: The fontSize property must be a number, not a string.
-// FIX: Changed fontSize to a number to match type definitions.
+// FIX: The fontSize property in Phaser text styles expects a number, not a string. Changed to a numeric value.
             fontSize: 96,
             color: '#f6e05e',
             fontStyle: 'bold',
@@ -3061,8 +3162,7 @@ class LevelCompleteScene extends Phaser.Scene {
         panel.strokeRoundedRect(GAME_WIDTH / 2 - 300, GAME_HEIGHT / 2 - 250, 600, 500, 16);
 
         this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 200, 'Level Complete!', {
-            // FIX: The fontSize property must be a number, not a string.
-// FIX: Changed fontSize to a number to match type definitions.
+// FIX: The fontSize property in Phaser text styles expects a number, not a string. Changed to a numeric value.
             fontSize: 48, color: '#2d3748', fontStyle: 'bold'
         }).setOrigin(0.5);
 
@@ -3076,6 +3176,7 @@ class LevelCompleteScene extends Phaser.Scene {
         const startY = GAME_HEIGHT / 2 - 60;
         const leftColX = GAME_WIDTH / 2 - 200;
         const rightColX = GAME_WIDTH / 2 + 180;
+// FIX: The fontSize property in Phaser text styles expects a number, not a string. Changed to a numeric value.
         const textStyle = { fontSize: 28, color: '#2d3748' };
 
         this.add.image(leftColX - 30, startY, 'icon_clock').setScale(1.2);
@@ -3098,6 +3199,7 @@ class LevelCompleteScene extends Phaser.Scene {
         line.fillRect(GAME_WIDTH/2 - 250, startY + 200, 500, 2);
 
         this.add.text(GAME_WIDTH / 2, startY + 240, `Total Score: ${stats.newTotalScore}`, {
+// FIX: The fontSize property in Phaser text styles expects a number, not a string. Changed to a numeric value.
             fontSize: 36, color: '#2d3748', fontStyle: 'bold'
         }).setOrigin(0.5);
         
@@ -3107,6 +3209,7 @@ class LevelCompleteScene extends Phaser.Scene {
         const buttonText = isLastLevel ? 'Finish' : 'Continue';
         
         const continueButton = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 200, buttonText, {
+// FIX: The fontSize property in Phaser text styles expects a number, not a string. Changed to a numeric value.
             fontSize: 32, color: '#f7fafc', fontStyle: 'bold', backgroundColor: '#38a169', padding: { x: 20, y: 10 }
         }).setOrigin(0.5).setInteractive();
 
@@ -3115,14 +3218,16 @@ class LevelCompleteScene extends Phaser.Scene {
         continueButton.on('pointerdown', () => {
             this.cameras.main.fadeOut(250, 0, 0, 0, (_camera, progress) => {
                 if (progress === 1) {
+                    this.scene.stop('GameScene'); // Explicitly stop the paused game scene
                     if (isLastLevel) {
                         // FIX: Ensure newTotalScore is a number before passing it to the next scene.
                         this.scene.start('GameCompleteScene', { finalScore: Number(stats.newTotalScore) });
                     } else {
-                         // Return to level select to see newly unlocked levels
+                         // Return to level select to see newly unlocked levels, passing the new score
                         this.scene.start('LevelSelectScene', {
                             challenge: stats.challenge,
-                            isCompleted: stats.isCompletedForSession
+                            isCompleted: stats.isCompletedForSession,
+                            currentScore: stats.newTotalScore
                         });
                     }
                 }
@@ -3145,11 +3250,13 @@ class GameCompleteScene extends Phaser.Scene {
     
     preload() {
         // Confetti particle
-        const particleGraphics = this.make.graphics();
-        particleGraphics.fillStyle(0xffffff);
-        particleGraphics.fillRect(0, 0, 8, 8);
-        particleGraphics.generateTexture('confetti', 8, 8);
-        particleGraphics.destroy();
+        if (!this.textures.exists('confetti')) {
+            const particleGraphics = this.make.graphics();
+            particleGraphics.fillStyle(0xffffff);
+            particleGraphics.fillRect(0, 0, 8, 8);
+            particleGraphics.generateTexture('confetti', 8, 8);
+            particleGraphics.destroy();
+        }
     }
 
     create() {
@@ -3158,8 +3265,7 @@ class GameCompleteScene extends Phaser.Scene {
         this.add.image(0, 0, 'background').setOrigin(0);
 
         this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 150, 'Congratulations!', {
-            // FIX: The fontSize property must be a number, not a string.
-// FIX: Changed fontSize to a number to match type definitions.
+// FIX: The fontSize property in Phaser text styles expects a number, not a string. Changed to a numeric value.
             fontSize: 80,
             color: '#f6e05e', // Gold color
             fontStyle: 'bold',
@@ -3168,6 +3274,7 @@ class GameCompleteScene extends Phaser.Scene {
         }).setOrigin(0.5);
         
         this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 50, 'You have completed the\nUltimate Level Challenge!', {
+// FIX: The fontSize property in Phaser text styles expects a number, not a string. Changed to a numeric value.
             fontSize: 40,
             color: '#f7fafc',
             fontStyle: 'bold',
@@ -3177,6 +3284,7 @@ class GameCompleteScene extends Phaser.Scene {
         }).setOrigin(0.5);
         
         this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 50, `Final Score: ${this.finalScore}`, {
+// FIX: The fontSize property in Phaser text styles expects a number, not a string. Changed to a numeric value.
             fontSize: 48,
             color: '#f7fafc',
             fontStyle: 'bold',
@@ -3185,6 +3293,7 @@ class GameCompleteScene extends Phaser.Scene {
         }).setOrigin(0.5);
 
         const menuButton = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 150, 'Return to Main Menu', {
+// FIX: The fontSize property in Phaser text styles expects a number, not a string. Changed to a numeric value.
             fontSize: 32,
             color: '#f7fafc',
             fontStyle: 'bold',
@@ -3225,12 +3334,14 @@ class GameOverScene extends Phaser.Scene {
         this.cameras.main.fadeIn(250, 0, 0, 0);
         this.scene.get('GameScene').sound.stopAll();
         this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 100, 'Game Over', {
+// FIX: The fontSize property in Phaser text styles expects a number, not a string. Changed to a numeric value.
             fontSize: 64,
             color: '#c53030',
             fontStyle: 'bold'
         }).setOrigin(0.5);
         
         const retryButton = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 50, 'Retry', {
+// FIX: The fontSize property in Phaser text styles expects a number, not a string. Changed to a numeric value.
             fontSize: 32,
             color: '#f7fafc',
             fontStyle: 'bold',
@@ -3243,8 +3354,8 @@ class GameOverScene extends Phaser.Scene {
         retryButton.on('pointerdown', () => {
             this.cameras.main.fadeOut(250, 0, 0, 0, (_camera, progress) => {
                 if (progress === 1) {
-                    // FIX: Corrected unsafe type casting from Scene to GameScene.
-                    const gameScene = this.scene.get('GameScene') as unknown as GameScene;
+                    // FIX: Refined type casting for better readability and type safety.
+                    const gameScene = this.scene.get('GameScene') as GameScene;
                     const data = {
                         levelIndex: gameScene.levelIndex,
                         score: gameScene.initialScore,
@@ -3258,6 +3369,7 @@ class GameOverScene extends Phaser.Scene {
         });
 
         const menuButton = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 120, 'Main Menu', {
+// FIX: The fontSize property in Phaser text styles expects a number, not a string. Changed to a numeric value.
             fontSize: 32,
             color: '#f7fafc',
             fontStyle: 'bold',
@@ -3294,12 +3406,14 @@ class PauseScene extends Phaser.Scene {
         bg.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
 
         this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 100, 'Paused', {
+// FIX: The fontSize property in Phaser text styles expects a number, not a string. Changed to a numeric value.
             fontSize: 64,
             color: '#f7fafc',
             fontStyle: 'bold'
         }).setOrigin(0.5);
 
         const resumeButton = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 50, 'Resume', {
+// FIX: The fontSize property in Phaser text styles expects a number, not a string. Changed to a numeric value.
             fontSize: 32, color: '#f7fafc', fontStyle: 'bold', backgroundColor: '#38a169', padding: { x: 20, y: 10 }
         }).setOrigin(0.5).setInteractive();
 
@@ -3312,6 +3426,7 @@ class PauseScene extends Phaser.Scene {
         });
 
         const restartButton = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 120, 'Restart Level', {
+// FIX: The fontSize property in Phaser text styles expects a number, not a string. Changed to a numeric value.
             fontSize: 32, color: '#f7fafc', fontStyle: 'bold', backgroundColor: '#8b5a2b', padding: { x: 20, y: 10 }
         }).setOrigin(0.5).setInteractive();
 
@@ -3329,6 +3444,7 @@ class PauseScene extends Phaser.Scene {
         });
 
         const menuButton = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 190, 'Main Menu', {
+// FIX: The fontSize property in Phaser text styles expects a number, not a string. Changed to a numeric value.
             fontSize: 32, color: '#f7fafc', fontStyle: 'bold', backgroundColor: '#4a5568', padding: { x: 20, y: 10 }
         }).setOrigin(0.5).setInteractive();
 
@@ -3377,9 +3493,12 @@ class UIScene extends Phaser.Scene {
     create() {
         const gameScene = this.scene.get('GameScene');
 
+// FIX: The fontSize property in Phaser text styles expects a number, not a string. Changed to a numeric value.
         this.scoreText = this.add.text(20, 20, 'Score: 0', { fontSize: 32, color: '#f7fafc', fontStyle: 'bold', stroke: '#2d3748', strokeThickness: 6 });
+// FIX: The fontSize property in Phaser text styles expects a number, not a string. Changed to a numeric value.
         this.powerUpText = this.add.text(GAME_WIDTH - 90, 20, '', { fontSize: 24, color: '#f7fafc', fontStyle: 'bold', align: 'right' }).setOrigin(1, 0);
 
+// FIX: The fontSize property in Phaser text styles expects a number, not a string. Changed to a numeric value.
         this.challengeText = this.add.text(GAME_WIDTH / 2, 20, this.dailyChallenge.progressText(0), { fontSize: 24, color: '#f7fafc', fontStyle: 'bold' }).setOrigin(0.5, 0);
         if (this.isChallengeCompleted) {
             this.challengeText.setText('Daily Challenge Completed!');
@@ -3461,8 +3580,7 @@ class UIScene extends Phaser.Scene {
             this.bossHealthBar.fillStyle(0xc53030);
             this.bossHealthBar.fillRect(GAME_WIDTH / 2 - 250, GAME_HEIGHT - 60, 500, 30);
             
-            // FIX: The fontSize property must be a number, not a string.
-// FIX: Changed fontSize to a number to match type definitions.
+// FIX: The fontSize property in Phaser text styles expects a number, not a string. Changed to a numeric value.
             const bossTitle = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 75, '', { fontSize: 24, color: '#f7fafc', fontStyle: 'bold' }).setOrigin(0.5, 0);
             bossTitle.text = 'JUNGLE KING';
         }, this);
@@ -3476,8 +3594,8 @@ class UIScene extends Phaser.Scene {
             }
         }, this);
         
-        // FIX: Corrected unsafe type casting from Scene to GameScene.
-        if (!(gameScene as unknown as GameScene).isBossLevel) {
+        // FIX: Refined type casting for better readability and type safety.
+        if (!(gameScene as GameScene).isBossLevel) {
             const barWidth = 400;
             const barX = GAME_WIDTH / 2 - barWidth / 2;
             const barY = GAME_HEIGHT - 40;
@@ -3515,22 +3633,18 @@ class UIScene extends Phaser.Scene {
         this.dashIcon = this.add.graphics();
         this.dashIcon.fillStyle(0x4299e1, 0.8);
         this.dashIcon.fillRoundedRect(30, abilityY - 25, 50, 50, 8);
-        // FIX: Using an intermediate variable and .text property assignment to bypass potential typing issue with add.text method.
-        const dashLabel = this.add.text(55, abilityY, '', { fontSize: 14, color: '#fff', fontStyle: 'bold'}).setOrigin(0.5);
-        dashLabel.text = 'DASH';
-        // FIX: The fontSize property must be a number, not a string.
-// FIX: Changed fontSize to a number to match type definitions.
+// FIX: The fontSize property in Phaser text styles expects a number, not a string. Changed to a numeric value.
+        const dashLabel = this.add.text(55, abilityY, 'DASH', { fontSize: 14, color: '#fff', fontStyle: 'bold'}).setOrigin(0.5);
+// FIX: The fontSize property in Phaser text styles expects a number, not a string. Changed to a numeric value.
         this.dashCooldownText = this.add.text(55, abilityY, '', { fontSize: 24, color: '#fff', fontStyle: 'bold'}).setOrigin(0.5);
 
         // Parry UI
         this.parryIcon = this.add.graphics();
         this.parryIcon.fillStyle(0x68d391, 0.8);
         this.parryIcon.fillRoundedRect(90, abilityY - 25, 50, 50, 8);
-        // FIX: Using an intermediate variable and .text property assignment to bypass potential typing issue with add.text method.
-        const parryLabel = this.add.text(115, abilityY, '', { fontSize: 12, color: '#fff', fontStyle: 'bold'}).setOrigin(0.5);
-        parryLabel.text = 'PARRY';
-        // FIX: Changed fontSize to a number to match type definitions.
-// FIX: Changed fontSize to a number to match type definitions.
+// FIX: The fontSize property in Phaser text styles expects a number, not a string. Changed to a numeric value.
+        const parryLabel = this.add.text(115, abilityY, 'PARRY', { fontSize: 12, color: '#fff', fontStyle: 'bold'}).setOrigin(0.5);
+// FIX: The fontSize property in Phaser text styles expects a number, not a string. Changed to a numeric value.
         this.parryCooldownText = this.add.text(115, abilityY, '', { fontSize: 24, color: '#fff', fontStyle: 'bold'}).setOrigin(0.5);
 
         gameScene.events.on('dashStatusChanged', (data: { ready: boolean; cooldown: number; }) => {
