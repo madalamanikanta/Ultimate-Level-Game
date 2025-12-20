@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 // FIX: Corrected typo in constant name from DAILY_CHallenge_REWARD to DAILY_CHALLENGE_REWARD.
 import { GAME_WIDTH, GAME_HEIGHT, PLAYER_SPEED, PLAYER_JUMP_VELOCITY, GRAVITY, SPEED_BOOST_MODIFIER, SPEED_BOOST_DURATION, JUMP_BOOST_MODIFIER, JUMP_BOOST_DURATION, ENEMY_SPEED, CHALLENGES, DAILY_CHALLENGE_REWARD, LEVELS, DASH_VELOCITY, DASH_DURATION, DASH_COOLDOWN, BOSS_HEALTH, TURTLE_ROLL_SPEED, COSMETICS, PARRY_WINDOW, PARRY_COOLDOWN, ENEMY_STUN_DURATION } from './constants';
+import { syncProgress } from "./services/api";
 
 // Helper functions for managing cosmetic data in localStorage
 const getCosmeticsData = () => {
@@ -40,7 +41,21 @@ const getLevelData = () => {
 };
 
 const saveLevelData = (data: any) => {
-    localStorage.setItem('ultimateLevelChallenge_levelData', JSON.stringify(data));
+    try {
+        // 1️⃣ Always save locally first (offline-first)
+        localStorage.setItem(
+            'ultimateLevelChallenge_levelData',
+            JSON.stringify(data)
+        );
+
+        // 2️⃣ Fire-and-forget backend sync
+        // Does NOT block gameplay
+        // Safe if internet is off
+        syncProgress(data);
+    } catch (err) {
+        // Never crash the game because of saving
+        console.error("Failed to save level data:", err);
+    }
 };
 
 
@@ -648,7 +663,7 @@ class CustomizationScene extends Phaser.Scene {
         }
 
         if (this.previewHat) {
-            if (hat && hat.texture) {
+            if (hat && hat.texture && this.textures.exists(hat.texture)) {
                 this.previewHat.setTexture(hat.texture).setVisible(true);
             } else {
                 this.previewHat.setVisible(false);
@@ -1659,7 +1674,7 @@ class GameScene extends Phaser.Scene {
         }
         
         // Emitter setup
-        this.dashEmitter = this.add.particles('particle_blue', undefined, {
+        this.dashEmitter = this.add.particles(0, 0, 'particle_blue', {
             speed: { min: -100, max: 100 },
             scale: { start: 1, end: 0 },
             blendMode: 'SCREEN',
@@ -1669,7 +1684,8 @@ class GameScene extends Phaser.Scene {
         });
         this.dashEmitter.startFollow(this.player);
 
-        this.landEmitter = this.add.particles('particle_smoke', undefined, {
+
+        this.landEmitter = this.add.particles(0 , 0 , 'particle_smoke', {
             speed: { min: 50, max: 100 },
             angle: { min: 240, max: 300 },
             scale: { start: 1, end: 0 },
@@ -1678,7 +1694,7 @@ class GameScene extends Phaser.Scene {
             emitting: false
         });
 
-        this.collectEmitter = this.add.particles('particle_gold', undefined, {
+        this.collectEmitter = this.add.particles(0 , 0 , 'particle_gold', {
             speed: { min: 100, max: 200 },
             angle: { min: 0, max: 360 },
             scale: { start: 1.5, end: 0 },
@@ -1693,7 +1709,7 @@ class GameScene extends Phaser.Scene {
             }
         });
 
-        this.enemyDefeatEmitter = this.add.particles('particle_smoke', undefined, {
+        this.enemyDefeatEmitter = this.add.particles(0,0,'particle_smoke', {
             speed: { min: 50, max: 150 },
             scale: { start: 1, end: 0 },
             lifespan: 500,
@@ -1701,7 +1717,7 @@ class GameScene extends Phaser.Scene {
             emitting: false
         });
 
-        this.parrySuccessEmitter = this.add.particles('particle_blue', undefined, {
+        this.parrySuccessEmitter = this.add.particles(0,0,'particle_blue', {
             speed: { min: 200, max: 400 },
             scale: { start: 2, end: 0 },
             blendMode: 'ADD',
@@ -1709,7 +1725,7 @@ class GameScene extends Phaser.Scene {
             emitting: false
         });
 
-        this.bossHitEmitter = this.add.particles('explosion_particle', undefined, {
+        this.bossHitEmitter = this.add.particles(0,0,'explosion_particle', {
             speed: { min: 100, max: 300 },
             scale: { start: 0.8, end: 0 },
             blendMode: 'SCREEN',
@@ -1717,6 +1733,29 @@ class GameScene extends Phaser.Scene {
             emitting: false
         });
 
+        // Ensure particle emitters and timers are cleaned up when the scene shuts down
+        this.events.once('shutdown', () => {
+            try {
+                const emitters = [this.dashEmitter, this.landEmitter, this.collectEmitter, this.enemyDefeatEmitter, this.parrySuccessEmitter, this.bossHitEmitter];
+                emitters.forEach(em => {
+                    if (!em) return;
+                    // Particle managers returned by add.particles expose destroy()
+                    try { (em as any).stop && (em as any).stop(); } catch (e) {}
+                    try { (em as any).destroy && (em as any).destroy(); } catch (e) {}
+                });
+
+                // Stop any active timers
+                try { this.activePowerUpTimer && this.activePowerUpTimer.destroy(); } catch (e) {}
+                try { this.dashCooldownTimer && this.dashCooldownTimer.destroy(); } catch (e) {}
+                try { this.parryCooldownTimer && this.parryCooldownTimer.destroy(); } catch (e) {}
+                try { this.attackTimer && this.attackTimer.destroy(); } catch (e) {}
+
+                // Stop all sounds to avoid referencing destroyed audio contexts
+                try { this.sound && this.sound.stopAll(); } catch (e) {}
+            } catch (err) {
+                console.warn('Error during GameScene shutdown cleanup', err);
+            }
+        });
 
         if (!this.isBossLevel) {
             this.goal = this.physics.add.staticSprite(level.goal.x, level.goal.y, 'goal');
@@ -2465,31 +2504,38 @@ class GameScene extends Phaser.Scene {
     }
     
     hitTrap() {
-        if (this.isInvincible || !this.player.active || this.isHurt) return;
-        this.isHurt = true;
-        this.isInvincible = false;
-        this.cameras.main.shake(200, 0.01);
-        this.tweens.killTweensOf(this.player);
-        this.physics.pause();
-        this.player.active = false;
-        
-        if (this.isSwinging) {
-            this.stopSwinging(true);
-        }
-        
-        this.player.anims.play('hurt');
-        this.player.setTint(0xff0000);
-        this.playerHat?.setTint(0xff0000);
+    if (this.isInvincible || !this.player.active || this.isHurt) return;
 
-        this.time.delayedCall(500, () => {
-             this.cameras.main.fadeOut(500, 0, 0, 0, (_camera, progress) => {
-                if (progress === 1) {
-                    this.scene.stop('UIScene');
-                    this.scene.start('GameOverScene');
-                }
-             });
-        });
+    // ☠️ DEATH COUNTER (GLOBAL, PERSISTENT)
+    const deaths = Number(localStorage.getItem("ulg_deaths") || 0);
+    localStorage.setItem("ulg_deaths", String(deaths + 1));
+
+    this.isHurt = true;
+    this.isInvincible = false;
+    this.cameras.main.shake(200, 0.01);
+    this.tweens.killTweensOf(this.player);
+    this.physics.pause();
+    this.player.active = false;
+
+    if (this.isSwinging) {
+        this.stopSwinging(true);
     }
+
+    this.player.anims.play('hurt');
+    this.player.setTint(0xff0000);
+    this.playerHat?.setTint(0xff0000);
+
+    this.time.delayedCall(500, () => {
+        this.cameras.main.fadeOut(500, 0, 0, 0, (_camera, progress) => {
+            if (progress === 1) {
+                this.scene.stop('UIScene');
+                this.scene.start('GameOverScene');
+            }
+        });
+    });
+}
+
+
     
     reachGoal() {
         if (!this.player.active) return;
@@ -2845,7 +2891,7 @@ class GameScene extends Phaser.Scene {
     
                 const selectedAttack = Phaser.Math.RND.pick(availableAttacks);
     
-                const tellVFX = this.add.particles('sparkle', undefined, {
+                const tellVFX = this.add.particles(0,0,'sparkle', {
                     x: this.boss.x,
                     y: this.boss.y - 64,
                     speed: { min: -100, max: 100 },
@@ -3003,7 +3049,7 @@ class GameScene extends Phaser.Scene {
 
         this.cameras.main.shake(500, 0.02);
 
-        const emitter = this.add.particles('explosion_particle', undefined, {
+        const emitter = this.add.particles(0,0,'explosion_particle', {
             x: this.boss.x,
             y: this.boss.y,
             speed: { min: -400, max: 400 },
@@ -3311,7 +3357,7 @@ class GameCompleteScene extends Phaser.Scene {
             });
         });
         
-        this.add.particles('confetti', undefined, {
+        this.add.particles(0,0,'confetti', {
             x: { min: 0, max: GAME_WIDTH },
             y: -10,
             lifespan: 5000,
@@ -3537,64 +3583,58 @@ class UIScene extends Phaser.Scene {
             }
         });
 
-        gameScene.events.on('scoreChanged', () => {
-            // FIX: Use the .text property to update text content, resolving a type error.
+        // Register named handlers so we can remove them on UI shutdown and avoid leaks
+        const onScoreChanged = () => {
             this.scoreText.text = `Score: ${gameScene.registry.get('score')}`;
-        }, this);
-        
-        gameScene.events.on('powerUpChanged', (data: { type: string; timeLeft: number }) => {
+        };
+
+        const onPowerUpChanged = (data: { type: string; timeLeft: number }) => {
             if (data.type === 'None' || data.timeLeft <= 0) {
-                // FIX: Use the .text property to update text content, resolving a type error.
                 this.powerUpText.text = '';
             } else if (data.type === 'shield') {
-                // FIX: Use the .text property to update text content, resolving a type error.
                 this.powerUpText.text = 'Shield Active';
                 this.powerUpText.setColor('#68d391');
             } else {
-                // FIX: Use the .text property to update text content, resolving a type error.
                 this.powerUpText.text = `${data.type.toUpperCase()} Boost: ${data.timeLeft}s`;
-                 this.powerUpText.setColor(data.type === 'speed' ? '#4299e1' : '#68d391');
+                this.powerUpText.setColor(data.type === 'speed' ? '#4299e1' : '#68d391');
             }
-        }, this);
-        
-        gameScene.events.on('challengeProgressChanged', (data: { progress: number; }) => {
+        };
+
+        const onChallengeProgressChanged = (data: { progress: number }) => {
             if (!this.isChallengeCompleted) {
-                // FIX: Use the .text property to update text content, resolving a type error.
                 this.challengeText.text = this.dailyChallenge.progressText(data.progress);
             }
-        }, this);
-        
-        gameScene.events.on('challengeCompleted', () => {
+        };
+
+        const onChallengeCompleted = () => {
             this.isChallengeCompleted = true;
-            // FIX: Use the .text property to update text content, resolving a type error.
             this.challengeText.text = 'Challenge Complete!';
             this.challengeText.setColor('#48bb78');
-        }, this);
+        };
 
-        gameScene.events.on('bossSpawned', (data: { maxHealth: number; currentHealth: number; }) => {
+        const onBossSpawned = (data: { maxHealth: number; currentHealth: number }) => {
             this.bossHealthBarBg = this.add.graphics();
             this.bossHealthBarBg.fillStyle(0x2d3748, 0.8);
             this.bossHealthBarBg.fillRect(GAME_WIDTH / 2 - 250, GAME_HEIGHT - 60, 500, 30);
-            
+
             this.bossHealthBar = this.add.graphics();
             this.bossHealthBar.fillStyle(0xc53030);
             this.bossHealthBar.fillRect(GAME_WIDTH / 2 - 250, GAME_HEIGHT - 60, 500, 30);
-            
-// FIX: The fontSize property in Phaser text styles expects a number, not a string. Changed to a numeric value.
+
             const bossTitle = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 75, '', { fontSize: 24, color: '#f7fafc', fontStyle: 'bold' }).setOrigin(0.5, 0);
             bossTitle.text = 'JUNGLE KING';
-        }, this);
-        
-        gameScene.events.on('bossHealthChanged', (data: { currentHealth: number }) => {
+        };
+
+        const onBossHealthChanged = (data: { currentHealth: number }) => {
             if (this.bossHealthBar) {
                 const width = 500 * (data.currentHealth / BOSS_HEALTH);
                 this.bossHealthBar.clear();
                 this.bossHealthBar.fillStyle(0xc53030);
                 this.bossHealthBar.fillRect(GAME_WIDTH / 2 - 250, GAME_HEIGHT - 60, width, 30);
             }
-        }, this);
-        
-        // FIX: Refined type casting for better readability and type safety.
+        };
+
+        // Progress bar UI (non-boss levels)
         if (!(gameScene as GameScene).isBossLevel) {
             const barWidth = 400;
             const barX = GAME_WIDTH / 2 - barWidth / 2;
@@ -3607,13 +3647,13 @@ class UIScene extends Phaser.Scene {
             this.progressBar = this.add.graphics();
             this.progressBar.fillStyle(0xf6e05e);
             this.progressBar.fillRoundedRect(barX, barY, 0, 12, 6);
-            
+
             this.add.image(barX - 25, barY + 6, 'player_marker_icon').setOrigin(0.5);
             this.add.image(barX + barWidth + 25, barY + 6, 'goal_marker_icon').setOrigin(0.5);
 
             this.playerMarker = this.add.image(barX, barY + 6, 'player_marker_icon').setOrigin(0.5);
 
-            gameScene.events.on('progressUpdated', (progress: number) => {
+            const onProgressUpdated = (progress: number) => {
                 const newWidth = barWidth * progress;
                 if (this.progressBar) {
                     this.progressBar.clear();
@@ -3623,7 +3663,10 @@ class UIScene extends Phaser.Scene {
                 if (this.playerMarker) {
                     this.playerMarker.x = barX + newWidth;
                 }
-            }, this);
+            };
+
+            gameScene.events.on('progressUpdated', onProgressUpdated, this);
+            // Remember to remove on shutdown (below)
         }
 
         // Ability Cooldowns UI
@@ -3633,43 +3676,62 @@ class UIScene extends Phaser.Scene {
         this.dashIcon = this.add.graphics();
         this.dashIcon.fillStyle(0x4299e1, 0.8);
         this.dashIcon.fillRoundedRect(30, abilityY - 25, 50, 50, 8);
-// FIX: The fontSize property in Phaser text styles expects a number, not a string. Changed to a numeric value.
         const dashLabel = this.add.text(55, abilityY, 'DASH', { fontSize: 14, color: '#fff', fontStyle: 'bold'}).setOrigin(0.5);
-// FIX: The fontSize property in Phaser text styles expects a number, not a string. Changed to a numeric value.
         this.dashCooldownText = this.add.text(55, abilityY, '', { fontSize: 24, color: '#fff', fontStyle: 'bold'}).setOrigin(0.5);
 
         // Parry UI
         this.parryIcon = this.add.graphics();
         this.parryIcon.fillStyle(0x68d391, 0.8);
         this.parryIcon.fillRoundedRect(90, abilityY - 25, 50, 50, 8);
-// FIX: The fontSize property in Phaser text styles expects a number, not a string. Changed to a numeric value.
         const parryLabel = this.add.text(115, abilityY, 'PARRY', { fontSize: 12, color: '#fff', fontStyle: 'bold'}).setOrigin(0.5);
-// FIX: The fontSize property in Phaser text styles expects a number, not a string. Changed to a numeric value.
         this.parryCooldownText = this.add.text(115, abilityY, '', { fontSize: 24, color: '#fff', fontStyle: 'bold'}).setOrigin(0.5);
 
-        gameScene.events.on('dashStatusChanged', (data: { ready: boolean; cooldown: number; }) => {
+        const onDashStatusChanged = (data: { ready: boolean; cooldown: number }) => {
             if (data.ready) {
                 this.dashIcon?.setAlpha(1);
-                // FIX: Using .text property assignment to bypass potential typing issue with setText method.
                 if (this.dashCooldownText) this.dashCooldownText.text = '';
             } else {
                 this.dashIcon?.setAlpha(0.4);
-                // FIX: Using .text property assignment to bypass potential typing issue with setText method.
                 if (this.dashCooldownText) this.dashCooldownText.text = `${(data.cooldown / 1000).toFixed(1)}`;
             }
-        }, this);
+        };
 
-        gameScene.events.on('parryStatusChanged', (data: { ready: boolean; cooldown: number; }) => {
-             if (data.ready) {
+        const onParryStatusChanged = (data: { ready: boolean; cooldown: number }) => {
+            if (data.ready) {
                 this.parryIcon?.setAlpha(1);
-                // FIX: Using .text property assignment to bypass potential typing issue with setText method.
                 if (this.parryCooldownText) this.parryCooldownText.text = '';
             } else {
                 this.parryIcon?.setAlpha(0.4);
-                // FIX: Using .text property assignment to bypass potential typing issue with setText method.
                 if (this.parryCooldownText) this.parryCooldownText.text = `${(data.cooldown / 1000).toFixed(1)}`;
             }
-        }, this);
+        };
+
+        // Attach named handlers
+        gameScene.events.on('scoreChanged', onScoreChanged, this);
+        gameScene.events.on('powerUpChanged', onPowerUpChanged, this);
+        gameScene.events.on('challengeProgressChanged', onChallengeProgressChanged, this);
+        gameScene.events.on('challengeCompleted', onChallengeCompleted, this);
+        gameScene.events.on('bossSpawned', onBossSpawned, this);
+        gameScene.events.on('bossHealthChanged', onBossHealthChanged, this);
+        gameScene.events.on('dashStatusChanged', onDashStatusChanged, this);
+        gameScene.events.on('parryStatusChanged', onParryStatusChanged, this);
+
+        // Ensure UI removes its listeners when it shuts down to avoid referencing destroyed GameScene
+        this.events.once('shutdown', () => {
+            try {
+                gameScene.events.off('scoreChanged', onScoreChanged, this);
+                gameScene.events.off('powerUpChanged', onPowerUpChanged, this);
+                gameScene.events.off('challengeProgressChanged', onChallengeProgressChanged, this);
+                gameScene.events.off('challengeCompleted', onChallengeCompleted, this);
+                gameScene.events.off('bossSpawned', onBossSpawned, this);
+                gameScene.events.off('bossHealthChanged', onBossHealthChanged, this);
+                gameScene.events.off('dashStatusChanged', onDashStatusChanged, this);
+                gameScene.events.off('parryStatusChanged', onParryStatusChanged, this);
+                gameScene.events.off('progressUpdated');
+            } catch (err) {
+                console.warn('Error cleaning up UI listeners:', err);
+            }
+        });
     }
 }
 
