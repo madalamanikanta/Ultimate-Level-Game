@@ -1,0 +1,5 @@
+{
+  "name": "Ultimate Level Challenge",
+  "description": "A fully playable 2D side-scrolling game with jungle-themed levels, physics, and challenges. Built with Phaser.",
+  "requestFramePermissions": []
+}

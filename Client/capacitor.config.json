@@ -1,0 +1,6 @@
+{
+  "appId": "com.ultimatelevel.challenge",
+  "appName": "Ultimate Level Challenge",
+  "webDir": "dist",
+  "bundledWebRuntime": false
+}
