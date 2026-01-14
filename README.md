@@ -325,20 +325,6 @@ npx cap open android
 
 ---
 
-## 📸 Screenshots
-
-[Screenshots to be added - placeholder for visual documentation]
-
-- Main Menu
-- Level Select Screen
-- Gameplay (Level 1-9)
-- Boss Battle (Level 10)
-- Customization Screen
-- Daily Challenge Display
-- Leaderboard
-
----
-
 ## 🔮 Future Improvements
 
 Based on the current architecture, potential enhancements include:
